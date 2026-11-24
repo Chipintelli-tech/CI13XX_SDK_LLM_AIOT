@@ -30,23 +30,7 @@ const cwsl_reg_asr_struct_t reg_cmd_list[]=
 
 };
 
-typedef enum
-{
-    CWSL_APP_REC, // 识别模式
-    CWSL_APP_REG, // 学习模式
-    CWSL_APP_DEL, // 删除模式
-} cwsl_app_mode_t;
-
-typedef struct
-{
-    int word_id;                    // 正在学习的命令词ID
-    cwsl_word_type_t word_type;     // 正在学习的命令词类型
-    cwsl_app_mode_t app_mode;       // 当前工作模式
-    uint8_t continus_flag;          // 是否连续学习，用于简化连续学习命令词时的提示音,0:非连续学习; 1:连续学习
-} cwsl_app_t;
-
 cwsl_app_t cwsl_app;
-
 static int get_next_reg_cmd_word_index();
 
 int cwsl_app_reset();
@@ -182,9 +166,7 @@ static void cwsl_play_done_callback_with_start_record(cmd_handle_t cmd_handle)
 // 学习开始事件响应 函数内部不能阻塞，延时
 int on_cwsl_reg_start(uint32_t cmd_id, uint16_t group_id, cwsl_word_type_t word_type)
 {    
-    #if AUDIO_DATA_UPLOAD_BY_UART
     asr_wakeup_on_handle();
-    #endif
     set_state_enter_wakeup(EXIT_WAKEUP_TIME); // 更新退出唤醒时间
     ci_logdebug(LOG_CWSL, "==on_cwsl_reg_start\n");
     cwsl_reg_record_stop(); // 在提示音播放期间，关闭模板录制功能
@@ -197,16 +179,17 @@ int on_cwsl_reg_start(uint32_t cmd_id, uint16_t group_id, cwsl_word_type_t word_
         cias_send_cmd(CWSL_UART_REGISTRATION_WAKE_ING, DEF_FILL); // 发送学习唤醒词 消息
         // 播放提示音 "开始学习唤醒词"
         prompt_play_by_cmd_id(CWSL_REGISTRATION_WAKE, -1, cwsl_play_done_callback_with_start_record, false);
+
     }
     else
     {
-        #if 0
+        #if 1
         if (!cwsl_app.continus_flag) // 如果是连续学习，就不播报“开始学习”
         {
-            prompt_play_by_cmd_id(CWSL_REGISTRATION_CMD, -1, cwsl_play_done_callback_default, true);
+            prompt_play_by_cmd_id(CWSL_REGISTRATION_CMD, -1, cwsl_play_done_callback_default, false);
         }
-
-        prompt_play_by_cmd_id(reg_cmd_list[cwsl_app.word_id].reg_play_id, -1, cwsl_play_done_callback_with_start_record, true);
+        cias_send_cmd(CWSL_UART_REGISTRATION_CMD_ING, DEF_FILL); // 发送学习唤醒词 消息
+        prompt_play_by_cmd_id(reg_cmd_list[cwsl_app.word_id].reg_play_id, -1, cwsl_play_done_callback_with_start_record, false);
         #endif
     }
     return 0;
@@ -243,9 +226,7 @@ int on_cwsl_record_end(int times, cwsl_reg_result_t result)
     uint32_t other_cmd_id = get_othercmd_id();
 
     ci_logdebug(LOG_CWSL, "==on_cwsl_record_end %d,%d\n", times, result);
-    #if AUDIO_DATA_UPLOAD_BY_UART
     cias_aiot_vad_end_handle(1);   //重置参数
-    #endif
     TaskHandle_t sys_task_handle = xTaskGetHandle("UserTaskManageP");
     vTaskSuspend(sys_task_handle);
     if (ciss_get(CI_SS_START_SLEEP_PROCESS) == 0)
@@ -280,7 +261,7 @@ int on_cwsl_record_end(int times, cwsl_reg_result_t result)
             }
             else if ((CWSL_RECORD_FAILED == result ) || ( CWSL_RECORD_FAILED_BY_DEFAULTCMD == result ))
             {
-                cias_send_cmd(CWSL_UART_REGISTRATION_WAKE_END_FAILED, DEF_FILL);//  // 发送学习唤醒词失败 消息
+                cias_send_cmd(CWSL_UART_REGISTRATION_END_FAILED, DEF_FILL);//  // 发送学习唤醒词失败 消息
 
                 cicwsl_func_index cmd_id_for_play = CWSL_DATA_ENTERY_FAILED;
                 if (CWSL_RECORD_FAILED_BY_DEFAULTCMD == result)
@@ -308,12 +289,12 @@ int on_cwsl_record_end(int times, cwsl_reg_result_t result)
                         //2遍情况下，学习失败，提示重新学习该词
                         if(CWSL_RECORD_FAILED_BY_DEFAULTCMD == result)
                         {
-                            prompt_play_by_cmd_id(CWSL_REG_FAILED_DEFAULT_CMD_CONFLICT, 1, cwsl_play_done_callback_default, true);
+                            prompt_play_by_cmd_id(CWSL_REG_FAILED_DEFAULT_CMD_CONFLICT, 1, cwsl_play_done_callback_default, false);
                         }
                         else
                         {
                             //播报 "学习失败，请重新学习 XX 指令"
-                            prompt_play_by_cmd_id(CWSL_REG_FAILED, 1, cwsl_play_done_callback_with_start_record, true);
+                            prompt_play_by_cmd_id(CWSL_REG_FAILED, 1, cwsl_play_done_callback_with_start_record, false);
                         }
                         //重新学习
                         extern void cwsl_app_reg_word_restart();
@@ -343,7 +324,7 @@ int on_cwsl_record_end(int times, cwsl_reg_result_t result)
             {
                 prompt_play_by_cmd_id(CWSL_REGISTRATION_SUCCESSFUL, -1, cwsl_play_done_callback_default, true);
 
-                cias_send_cmd(CWSL_UART_REGISTRATION_WAKE_END_SUCCESSFUL, DEF_FILL); //发送学习唤醒词成功 消息
+                cias_send_cmd(CWSL_UART_REGISTRATION_END_SUCCESSFUL, DEF_FILL); //发送学习唤醒词成功 消息
 
 
                 int next_cmd_index = get_next_reg_cmd_word_index(cwsl_app.word_id);
@@ -469,6 +450,9 @@ void cwsl_app_reg_word(cwsl_word_type_t word_type)
                 cwsl_app.word_type = WAKEUP_WORD;
                 cwsl_reg_word(WAKE_UP_ID, 0, WAKEUP_WORD);
                 cwsl_app.app_mode = CWSL_APP_REG;
+                #if USE_AEC_MODULE
+                ciss_set(CI_SS_CWSL_AEC_MUTE_STATE,CI_SS_CWSL_AEC_MUTE_ON);
+                #endif
             }
             else
             {
@@ -486,6 +470,9 @@ void cwsl_app_reg_word(cwsl_word_type_t word_type)
                 cwsl_reg_word(reg_cmd_list[next_cmd_index].reg_cmd_id, 0, CMD_WORD);
                 cwsl_app.app_mode = CWSL_APP_REG;
                 cwsl_app.continus_flag = 0;
+                #if USE_AEC_MODULE
+                ciss_set(CI_SS_CWSL_AEC_MUTE_STATE,CI_SS_CWSL_AEC_MUTE_ON);
+                #endif
             }
             else
             {
@@ -580,7 +567,7 @@ void cwsl_app_exit_delete_mode()
 // word_type: 指定要删除的命令词类型，传入-1为通配符，忽略此项
 void cwsl_app_delete_word(uint32_t cmd_id, uint16_t group_id, cwsl_word_type_t word_type)
 {
-    // if (cwsl_app.app_mode == CWSL_APP_DEL)
+    if (cwsl_app.app_mode == CWSL_APP_DEL)
     {
         cwsl_delete_word(cmd_id, group_id, word_type);
     }
@@ -620,24 +607,18 @@ uint32_t cwsl_app_process_asr_msg(sys_msg_asr_data_t *asr_msg, cmd_handle_t *cmd
     case CWSL_UART_REGISTRATION_WAKE:
         if (ciss_get(CI_SS_START_SLEEP_PROCESS) == 0)
         {
-            #if USE_AEC_MODULE
-            ciss_set(CI_SS_CWSL_AEC_MUTE_STATE,CI_SS_CWSL_AEC_MUTE_ON);
-            #endif
             set_state_enter_wakeup(EXIT_WAKEUP_TIME); // 更新退出唤醒时间
             sys_ignore_exit_msg_in_queue();
 			cwsl_app_reg_word(WAKEUP_WORD);
             cwsl_reg_check_other_asrcmd(cmd_id,1);//记录默认命令词，检测是否与学习的词条
-            
         }
         ret = 2;
         break;
     case CWSL_REGISTRATION_CMD://删除和学习不能连续调用
-    #if 0
+    case CWSL_UART_REGISTRATION_CMD:
+    #if 1
         if (ciss_get(CI_SS_START_SLEEP_PROCESS) == 0)
         {
-            #if USE_AEC_MODULE
-            ciss_set(CI_SS_CWSL_AEC_MUTE_STATE,CI_SS_CWSL_AEC_MUTE_ON);
-            #endif
             set_state_enter_wakeup(EXIT_WAKEUP_TIME); // 更新退出唤醒时间
             sys_ignore_exit_msg_in_queue();
 			cwsl_app_reg_word(CMD_WORD);
@@ -701,8 +682,12 @@ uint32_t cwsl_app_process_asr_msg(sys_msg_asr_data_t *asr_msg, cmd_handle_t *cmd
         }
         ret = 2;
         break;
-    case CWSL_DELETE_WAKE:      // 删除和学习不能连续调用
     case CWSL_UART_DELETE_WAKE: /*删除唤醒词*/
+        if (cwsl_app.app_mode == CWSL_APP_REC)
+        {
+            cwsl_app.app_mode = CWSL_APP_DEL;
+        }
+    case CWSL_DELETE_WAKE:      // 删除和学习不能连续调用
         if (ciss_get(CI_SS_START_SLEEP_PROCESS) == 0)
         {
             set_state_enter_wakeup(EXIT_WAKEUP_TIME); // 更新退出唤醒时间
@@ -712,6 +697,11 @@ uint32_t cwsl_app_process_asr_msg(sys_msg_asr_data_t *asr_msg, cmd_handle_t *cmd
         }
         ret = 2;
         break;
+    case CWSL_UART_DELETE_CMD:
+        if (cwsl_app.app_mode == CWSL_APP_REC)
+        {
+            cwsl_app.app_mode = CWSL_APP_DEL;
+        }
     case CWSL_DELETE_CMD://删除和学习不能连续调用
         if (ciss_get(CI_SS_START_SLEEP_PROCESS) == 0)
         {

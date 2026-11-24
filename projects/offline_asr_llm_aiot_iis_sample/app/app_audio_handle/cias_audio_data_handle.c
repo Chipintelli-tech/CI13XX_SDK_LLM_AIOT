@@ -7,7 +7,6 @@
 #include "cias_network_msg_send_task.h"
 #include "semphr.h"
 #include "cias_network_msg_protocol.h"
-#include "audio_play_api.h"
 #include "codec_manager.h"
 #include "ci_assert.h"
 #include "cias_demo_config.h"
@@ -20,14 +19,20 @@
 #include "ci_agc.h"
 #include "user_config.h"
 #include "system_msg_deal.h"
-#if NET_AUDIO_PLAY_BY_OPUS
+#include "ci_flash_data_info.h"
+#if SIMPLE_AUDIO_PLAYER_ENABLE
+#include "simple_audio_player.h"
+#include "player_data_fetcher.h"
+#else
+#include "audio_play_api.h"
+#endif
+#if NET_AUDIO_PLAY_BY_OPUS && !SIMPLE_AUDIO_PLAYER_ENABLE
 #include "opus.h"
 #include "debug.h"
 #include "opus_types.h"
 #include "opus_private.h"
 #include "opus_defines.h"
 #endif
-#include "ota_config.h"
 static void play_done_callback(cmd_handle_t cmd_handle)
 {
 }
@@ -123,9 +128,14 @@ void opus_data_decode_task(void *parameter)
 void pcm_data_play_task(void)
 {
     static bool send_data_flag = false;
+    #if !IIS_DOWNLOAD_BY_CMD   
+    vTaskDelay(pdMS_TO_TICKS(200));
+    #endif
     while (1)
     {
+        #if IIS_DOWNLOAD_BY_CMD   
         if (gCiasAiotRunParam.iis_play_start_flag)   
+        #endif 
         {
             uint32_t data_addr = 0;
             uint32_t data_size;
@@ -143,7 +153,7 @@ void pcm_data_play_task(void)
         // mprintf("size_p =%d\r\n",*size_p);
             // for(int i =0;i<32;i++)
             // mprintf("size_p =%d\r\n",size_p[0]);
-        #if USE_HP_OUT_PRE_RSLT_AUDIO
+        #if AUDIO_DATA_PLAY_BY_IIS
             uint32_t write_pcm_addr_cpy = 0;
             cm_get_pcm_buffer(PLAY_CODEC_ID, &write_pcm_addr_cpy, 10); // TODO HSL
             if (0 == write_pcm_addr_cpy)
@@ -181,6 +191,7 @@ void pcm_data_play_task(void)
                 send_data_flag = true;
             }
         }
+        #if IIS_DOWNLOAD_BY_CMD
         if(send_data_flag && !gCiasAiotRunParam.iis_play_start_flag)
         {
             send_data_flag = false;
@@ -188,13 +199,14 @@ void pcm_data_play_task(void)
             cm_set_codec_mute(PLAY_CODEC_ID, CODEC_OUTPUT, 3, ENABLE);
             cm_stop_codec(PLAY_CODEC_ID, CODEC_OUTPUT);
         }
+        #endif
         vTaskDelay(pdMS_TO_TICKS(16));
     }
 }
 int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
 {
     int32_t ret = RETURN_OK;
-    static uint8_t ans_cmd_buf[3] = {0};
+    static uint8_t ans_cmd_buf[6] = {0};
 #if NET_AUDIO_PLAY_BY_OPUS
     static uint8_t opus_play_data[REQUEST_ONE_FRAME_SEZIE];
     memset(opus_play_data, 0, REQUEST_ONE_FRAME_SEZIE);
@@ -494,34 +506,12 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         break;
     case SET_AUDIO_START_RECORD:
         mprintf("set SET_AUDIO_START_RECORD\r\n");
-        #if 0
-        asr_wakeup_on_handle();
-        cias_aiot_vad_start_handle(VAD_START);
-        gCiasAiotRunParam.is_vad_on_flag = true;
-        gCiasAiotRunParam.is_vad_force_on_flag = true;
-        if (!gCiasAiotFuncParam.upload_play_full_duplex || gCiasAiotFuncParam.vad_start_stop_paly)
-        {
-            gCiasAiotRunParam.request_play_data_flag = false;
-        }
-        #else
-        asr_wakeup_on_handle();
-        //gCiasAiotRunParam.is_vad_force_on_flag = true;
         gCiasAiotRunParam.is_always_iis_flag = true;
-        #endif
         break;
     case SET_AUDIO_STOP_RECORD:
         mprintf("set SET_AUDIO_STOP_RECORD\r\n");
-        #if 0
-        gCiasAiotRunParam.is_vad_force_on_flag = false;
-        cias_aiot_vad_end_handle(0x0);
-        gCiasAiotRunParam.is_vad_on_flag = false;
-        gCiasAiotRunParam.stop_collect_pcm_flag = true; // 最后执行
-        #else
-        //gCiasAiotRunParam.is_vad_force_on_flag = false;
         gCiasAiotRunParam.is_always_iis_flag = false;
         gCiasAiotRunParam.is_wake_up_flag = false;
-        //exit_wakeup_deal(1);
-        #endif
         break;
     case VAD_START_STOP_PLAY:
         mprintf("set VAD_START_STOP_PLAY\r\n");
@@ -536,7 +526,7 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
             goto PARSE_WIFI_MSG_ERR;
         }
         break;
-            #if 0
+    #if 0
     case NET_PLAY_START:
         mprintf("NET_PLAY_START.......\r\n");
         #if NET_AUDIO_PLAY_BY_MP3	
@@ -698,7 +688,26 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         cias_send_cmd(PLAY_TTS_END, DEF_FILL);
         break;
         #endif
-        
+    case SET_NET_PLAY_STATE:
+        if (pheader->len == 1)
+        {
+            uint8_t param = msg_buf[msg_offset];
+            mprintf("SET_NET_PLAY_STATE set = %d\r\n", param);
+            if (param == 1)
+            {
+                ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING);  //更新播放中状态
+            }
+            else if (param == 0)
+            {
+               	ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE);  //更新播放空闲
+            }
+            else
+            {
+                goto PARSE_WIFI_MSG_ERR;
+            }
+        }
+        break;
+#if IIS_DOWNLOAD_BY_CMD
     case MASTER_PLAY_STATE: //主控MCU发送播放状态
         if (pheader->len == 1)
         {
@@ -717,6 +726,7 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
             }
         }
         break;
+#endif
     case WIFI_CONNECTED: // wifi已连接成功
         wifi_current_state_set(WIFI_CONNECTED_STATE);
         mprintf("WIFI_CONNECTED ...\r\n");
@@ -802,12 +812,22 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
     case CIAS_AUDIO_RST:
         dpmu_software_reset_system_config();
         break;
+    case CIAS_GET_SOFT_VER:
+    {
+        product_version_t fw_version;
+        get_fw_version(&fw_version);
+        ans_cmd_buf[3] = (fw_version.soft_ware_version >> 16) & 0xff;
+        ans_cmd_buf[4] = (fw_version.soft_ware_version >> 8) & 0xff;
+        ans_cmd_buf[5] = fw_version.soft_ware_version & 0xff;
+        break;
+    }
+#if CI_OTA_ENABLE 
     case CIAS_OTA_START:
         mprintf("enter OTA MODE !!!\r\n");
-        write_ota_mcu_status(1);
+        write_ota_mcu_status(0x05);
 		dpmu_software_reset_system_config();
-
 		break;
+#endif
 #if IIS_CHANNEL_ENG_CALC_EANBLE
     case CIAS_FACTORY_START: // 开始测试
         mprintf("CIAS_FACTORY_START==\r\n");
@@ -902,9 +922,11 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         gCiasAiotRunParam.cloud_parse_is_busy_flag = false;
         break;
     #if USE_CWSL
-	case CWSL_UART_REGISTRATION_WAKE: /*开始学习*/
+	case CWSL_UART_REGISTRATION_WAKE: /*学习唤醒词*/
+    case CWSL_UART_REGISTRATION_CMD:  /*学习命令词*/
     case CWSL_UART_EXIT_REGISTRATION: /*退出学习*/
     case CWSL_UART_DELETE_WAKE:       /*删除唤醒词*/
+    case CWSL_UART_DELETE_CMD:        /*删除命令词*/
         mprintf("CWSL_UART_REGISTRATION %X\r\n", wifi_cmd);
         if(get_wakeup_state() != SYS_STATE_WAKEUP)
         {
@@ -922,12 +944,27 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         cwsl_app_process_asr_msg(NULL, NULL, wifi_cmd);
         break;
     #endif
+    case SET_FORCE_VAD_END:
+    mprintf("==SET_FORCE_VAD_END\r\n");
+    if(gCiasAiotRunParam.is_vad_on_flag)
+    {
+        gCiasAiotRunParam.is_vad_on_flag = false;
+        cias_aiot_vad_end_handle(0x0);
+    }
+    break;
     default:
         goto PARSE_WIFI_MSG_ERR;
         break;
     }
     ans_cmd_buf[2] = 0x01;   //执行成功
-    cias_send_cmd_and_data(CIAS_CMD_EXEC_STATE, ans_cmd_buf, 3, DEF_FILL);
+    if(wifi_cmd == CIAS_GET_SOFT_VER)
+    {
+        cias_send_cmd_and_data(CIAS_CMD_EXEC_STATE, ans_cmd_buf, 6, DEF_FILL);
+    }
+    else
+    {
+        cias_send_cmd_and_data(CIAS_CMD_EXEC_STATE, ans_cmd_buf, 3, DEF_FILL);
+    }
     return 0;
 PARSE_WIFI_MSG_ERR:
     mprintf("parse wifi msg error:pheader-len = %d\r\n", pheader->len);
@@ -945,12 +982,13 @@ void request_play_data_task(void *parameter)
 }
 bool cias_online_func_init(void)
 {
-    network_uart_port_init();   //配置交互串口参数
+#if WIFI_CMD_BY_UART
     if (!network_port_recv_queue_init())
     {
         mprintf("error %s  %d\n", __func__, __LINE__);
         return false;
     }
+    network_uart_port_init();   //配置交互串口参数
     if (!voice_upload_task_init())
     {
         mprintf("error %s  %d\n", __func__, __LINE__);
@@ -971,13 +1009,9 @@ bool cias_online_func_init(void)
         mprintf("error %s  %d\n", __func__, __LINE__);
         return false;
     }
+#endif
+#if !IF_USE_ANOTHER_CODEC_TO_GET_REF && AUDIO_DATA_PLAY_BY_IIS
     if (!xTaskCreate(pcm_data_play_task, "pcm_data_play_task", 512, NULL, 4, NULL)) // pcm播放任务
-    {
-        mprintf("error %s  %d\n", __func__, __LINE__);
-        return false;
-    }
-#if NET_AUDIO_PLAY_BY_OPUS
-    if (!xTaskCreate(opus_data_decode_task, "opus_data_decode_task", 1024 * 6, NULL, 4, NULL)) // opus数据解析任务
     {
         mprintf("error %s  %d\n", __func__, __LINE__);
         return false;
@@ -985,15 +1019,8 @@ bool cias_online_func_init(void)
 #endif
     return true;
 }
-cinv_item_ret_t write_ota_mcu_status(bool status)
+cinv_item_ret_t write_ota_mcu_status(uint8_t status)
 {
-    ota_nv_status_t ota_nv_status;
-    ota_nv_status.status = status;
-    ota_nv_status.ota_chip_type_1306 = OTA_CHIP_TYPE_1306;
-    ota_nv_status.timeout = OTA_TIMOUT;
-    ota_nv_status.retry_time = OTA_RETRY_TIME;
-    ota_nv_status.log_uart_number = CONFIG_CI_LOG_UART;
-    ota_nv_status.ota_uart_number = UART_NUM_SEND_PLAY_AUDIO_NUMBER;
-    ota_nv_status.ota_uart_baud = UART_NUM_SEND_PLAY_AUDIO_BAUDRATE;
-	return cinv_item_write(NVDATA_ID_OTA_MCU_STATUS, sizeof(ota_nv_status_t), &ota_nv_status);
+    uint8_t flag = status;
+	return cinv_item_write(NVDATA_ID_OTA_MCU_STATUS, sizeof(uint8_t), &flag);
 }

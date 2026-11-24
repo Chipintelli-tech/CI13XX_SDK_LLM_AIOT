@@ -6,7 +6,11 @@
 #include <stdbool.h>
 #include "user_config.h"
 #include "prompt_player.h"
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
 #include "audio_play_process.h"
+#else
+#include "simple_audio_player.h"
+#endif
 #include "ci130x_gpio.h"
 #include "FreeRTOS.h"
 #include "system_msg_deal.h"

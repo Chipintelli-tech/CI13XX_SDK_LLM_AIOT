@@ -10,7 +10,7 @@ USE_AEC_DENOISE_NN    := 0
 USE_ANY_MIC_AEC_DENOISE_NN = 1
 #自学习+AEC+DENOISE
 USE_CWSL_AEC_DENOISE_NN    := 2
-#DOA+AEC+DENOISE 该方案只支持上下行PCM
+#DOA+AEC+DENOISE 
 USE_AI_DOA_AEC_DENOISE_NN  := 3
 #######################################################################   
 CI_ALG_TYPE := $(USE_AEC_DENOISE_NN)

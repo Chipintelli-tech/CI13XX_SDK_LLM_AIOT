@@ -30,12 +30,8 @@
 const iis_out_audio_config_t iis_out_audio_config =
 {
 	.alg_enable = true,
-	.iis_out_enable = USE_IIS1_OUT_PRE_RSLT_AUDIO,			 //用于iis采音。
-#if AUDIO_DATA_UPLOAD_BY_UART
-	.uart_out_enable = 1,			 //用于uart采音。
-#else
+	.iis_out_enable = USE_IIS1_OUT_PRE_RSLT_AUDIO || AUDIO_DATA_UPLOAD_BY_HPOUT,			 //用于iis采音。
     .uart_out_enable = 0,			 //用于uart采音。
-#endif
 	.iis_left_channel = MICL,		 //左通道输出音频。MICL、MICR、REFL、REFR、DST1、DST2
 	.iis_right_channel = DST1,		 //右通道输出音频。MICL、MICR、REFL、REFR、DST1、DST2
 	.vad_mark_enable = false,		 //是否附带vad标签，默认左通道输出vad标签。
@@ -190,12 +186,11 @@ const aec_config_t aec_config =
 	.aec_control_mode = ENABLE_PLAYING_STATE_MODE,     //ENABLE_PLAYING_STATE_MODE:根据播报状态进行aec控制;  COMPUTE_REF_AMPL_MODE:根据参考幅值大小进行aec控制
 	.aec_gain = 1.0f,							       //增益数值
 	.aec_enable_threshold = 2000.0f,	               //参考信号判断门限值
-    .aec_mic_div_ref_thr = 0.0f,    
 	.nlp_flag = 2,
 	.aggr_mode = 1,
 	.fft_size = 256,	   //频域处理频点数
-	.alc_off_codec_adc_gain_mic = 20,   //可调
-    .alc_off_codec_adc_gain_ref = 0     //可调
+	.alc_off_codec_adc_gain_mic = 20,   //可调，单双麦都使用该增益
+    .alc_off_codec_adc_gain_ref = 0     //可调,仅使用内部codec作参考回路时使用，外部codec需在es7243e_init函数中设置alc_cfg_str.max_gain值
 };
 
 //vox模块配置
@@ -207,6 +202,8 @@ vox_config_t vox_config =
     .agc_gate_l = -6500.0f,
     .agc_gate_end = -3000.0f,
 
+	.vad_timeout_enable = VAD_TIMEOUT_CHECK,		// vad算法内部是否进行超时检测
+	.vad_on_max_timeout = VAD_FORCE_OVER_NUM_TIME,	// 强制结束录音的时间(单位S)
 };
 
 //.module_config域配置为NULL表示关闭此项。

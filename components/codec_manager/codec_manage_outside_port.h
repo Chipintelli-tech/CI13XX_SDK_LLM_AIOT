@@ -27,7 +27,7 @@ int cm_get_codec_empty_buffer_number(int codec_index, io_direction_t io_dir);
 int cm_get_codec_busy_buffer_number(int codec_index, io_direction_t io_dir);
 int cm_set_codec_alc(int codec_index, cm_cha_sel_t cha, FunctionalState alc_enable);
 int cm_set_codec_adc_gain(int codec_index, cm_cha_sel_t cha, int gain);
-
+int cm_get_codec_alc_state_npu(int codec_index);
 void audio_pre_rslt_write_data(int16_t* left,int16_t* right, uint32_t wrapfft_audio_addr);
 
 #ifdef __cplusplus

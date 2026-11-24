@@ -3,7 +3,20 @@
 
 #include "system_msg_deal.h"
 #include "cwsl_manage.h"
+typedef enum
+{
+    CWSL_APP_REC, // 识别模式
+    CWSL_APP_REG, // 学习模式
+    CWSL_APP_DEL, // 删除模式
+} cwsl_app_mode_t;
 
+typedef struct
+{
+    int word_id;                    // 正在学习的命令词ID
+    cwsl_word_type_t word_type;     // 正在学习的命令词类型
+    cwsl_app_mode_t app_mode;       // 当前工作模式
+    uint8_t continus_flag;          // 是否连续学习，用于简化连续学习命令词时的提示音,0:非连续学习; 1:连续学习
+} cwsl_app_t;
 
 typedef enum
 {

@@ -1,5 +1,6 @@
 #include "doa_app_handle.h"
-
+#include "cias_network_msg_protocol.h"
+#include "cias_network_msg_send_task.h"
 #if USE_AI_DOA
 int g_current_doa_angle = 0;
 int g_doa_out_result_flag = 0;   //doa输出角度信息标志
@@ -35,7 +36,7 @@ void ci_doa_get_cb(int audio_state, int doa_angle)
     g_doa_out_result_flag = 1;
     g_current_doa_angle = doa_angle;
 	mprintf("--------doa angle: %d°\n", doa_angle);
-
+    cias_send_cmd_and_data(DOA_ANGLE,&doa_angle,4,DEF_FILL);
     // if (abs(doa_angle - 90) <= DOA_ANGLE_THRESHOLD) {
     //     mprintf("doa angle 小于阈值 [%d]°, 不执行转动\n", DOA_ANGLE_THRESHOLD);
     // } else {

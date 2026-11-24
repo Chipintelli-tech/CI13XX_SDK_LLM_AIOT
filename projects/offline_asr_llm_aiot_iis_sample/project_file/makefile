@@ -6,8 +6,12 @@ include $(SDK_PATH)/utils/common_head.mk
 ########单一算法定义(注意:下面算法变量的值用户不可修改，值后更不能有空格)######## 
 #AEC+NN DENOISE
 USE_AEC_DENOISE_NN    := 0
+#ANY+AEC+DENOISE  需要外部挂7243e codec，-双mic算法，仅双mic可用
+USE_ANY_MIC_AEC_DENOISE_NN = 1
 #自学习+AEC+DENOISE
 USE_CWSL_AEC_DENOISE_NN    := 2
+#DOA+AEC+DENOISE 
+USE_AI_DOA_AEC_DENOISE_NN  := 3
 #######################################################################   
 CI_ALG_TYPE := $(USE_AEC_DENOISE_NN)
 

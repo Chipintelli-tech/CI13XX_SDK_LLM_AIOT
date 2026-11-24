@@ -100,17 +100,73 @@ void asr_wakeup_exit_handle(void)
 }
 void cias_aiot_vad_start_handle(int cmd)
 {
-    
+    ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_ON);
+    gCiasAiotRunParam.is_vad_on_flag = true;
+    cias_send_cmd(cmd, DEF_FILL);
 }
 void cias_aiot_vad_end_handle(int type)
 {
-    
+    cias_send_cmd(PCM_FINISH, DEF_FILL);
 }
 
 // vad状态检测任务
 void vad_state_handle_task(void *p_arg)
 {
-   
+    while (1)
+    {
+#if USE_CWSL
+        if (ciss_get(CI_SS_CWSL_IN_REG)) // 自学习学习状态不进行vad检测
+        {
+            vTaskDelay(pdMS_TO_TICKS(5));
+            continue;
+        }
+#endif
+#if WEAK_VAD_ENABLE
+        if (!gCiasAiotRunParam.is_vad_on_flag)
+        {
+            if (!gCiasAiotRunParam.is_wake_up_flag)
+            {
+                vTaskDelay(pdMS_TO_TICKS(5));
+                continue;
+            }
+        }
+#endif
+        if (ciss_get(CI_SS_VOX_VAD_STATE) == CI_SS_VAD_START) // 检测到vox vad start
+        {
+            mprintf("----vad start----\r\n");
+            cias_aiot_vad_start_handle(VAD_START);
+        }
+        if ((ciss_get(CI_SS_VOX_VAD_STATE) == CI_SS_VAD_END) && gCiasAiotRunParam.is_vad_on_flag) // nn vad end检测
+        {
+            gCiasAiotRunParam.is_vad_on_flag = false;
+#if UPLOAD_PCM_DATA_ENABLE && UPLOAD_PCM_VAD_TAG_ENABLE
+            short vad_end_tag = -32767;
+            voice_data_packet_and_send(PCM_MIDDLE, &vad_end_tag, 2);
+#endif
+            ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_IDLE);
+            if (!asr_reseult_wakup_flag)
+            {
+                mprintf("\r\n---vad end---\r\n");
+                cias_aiot_vad_end_handle(0x0);
+            }
+        }
+        if (1 == ciss_get(CI_SS_VOX_VAD_FORCE_END) && gCiasAiotRunParam.is_vad_on_flag) // 检测到强制结束
+        {
+            // if (gCiasAiotRunParam.vad_start_pcm_frame_count >= gCiasAiotFuncParam.vad_start_max_timeout * 1000 / 16) // vad on持续的帧数
+            {
+                gCiasAiotRunParam.is_vad_on_flag = false;
+                mprintf("\r\n-----force vad end-----\r\n");
+                // short vad_end_tag = -28000;
+                // voice_data_packet_and_send(PCM_MIDDLE, &vad_end_tag, 2);
+                // ciss_set(CI_SS_VOX_VAD_CLEAR, 1);
+                ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_IDLE);
+                ciss_set(CI_SS_VOX_VAD_FORCE_END, 0);
+                cias_aiot_vad_end_handle(0x0);
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
 }
 // pcm采音调试
 void pcm_debug_task(void *p_arg)
@@ -147,5 +203,10 @@ void cloud_ans_count_timer_callback(TimerHandle_t xTimer)
 }
 bool voice_upload_task_init(void)
 {
+    if (!xTaskCreate(vad_state_handle_task, "vad_state_handle_task", 256, NULL, 4, NULL))
+    {
+        mprintf("error %s  %d\n", __func__, __LINE__);
+        return false;
+    }
     return true;
 }

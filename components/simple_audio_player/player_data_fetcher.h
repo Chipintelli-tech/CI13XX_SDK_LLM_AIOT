@@ -21,7 +21,7 @@ typedef struct {
  * @breif 初始化数据获取器
  * @param src_data_info 数据源信息
  */
-extern void pdf_init(src_data_info_t *src_data_info);
+extern int pdf_init(src_data_info_t *src_data_info);
 
 /**
  * @breif 用于从数据拉取模块中读取数据
@@ -49,10 +49,6 @@ extern int32_t pdf_set_eos();
  * @breif 反初始化数据获取器, 用于释放数据获取器占用的资源
  */
 extern void pdf_deinit(void);
-/**
- * @breif 云端开始播放等待数据
- */
-extern void play_start_wait_data(void);
 /**
  * @breif 云端开始播放预先初始化
  */

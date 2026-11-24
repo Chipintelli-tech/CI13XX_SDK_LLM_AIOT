@@ -356,7 +356,7 @@ void board_clk_source_set(void)
  */
 const cm_codec_hw_info_t host_mic_hw_info = 
 {
-    #if AUDIO_PLAYER_ENABLE
+    #if AUDIO_PLAYER_ENABLE || AUDIO_DATA_PLAY_BY_IIS
     .IICx = IIC_NULL,
     .output_iis.IISx = IIS1,
     .output_iis.iis_mode_sel = IIS_MASTER,//IIS_SLAVE,//IIS_MASTER,
@@ -529,7 +529,12 @@ static cm_sound_info_t pre_rslt_out_sound_info =
     .channel_flag = 3,
     .sample_depth = IIS_DW_16BIT,
 };
-
+static cm_sound_info_t play_sound_info = 
+{
+    .sample_rate = 16000,
+    .channel_flag = 1,
+    .sample_depth = IIS_DW_16BIT,
+};
 
 /**
  * @brief 语音前处理使用CODEC的初始化
@@ -543,11 +548,7 @@ void audio_pre_rslt_out_codec_init(void)
 
     cm_pcm_buffer_info_t pcm_buffer_info;
     pcm_buffer_info.play_buffer_info.block_num = 1;
-    #if USE_DENOISE_NN || USE_AI_DOA   //前端计算太慢，需要加大play buffer
-    pcm_buffer_info.play_buffer_info.buffer_num = AUDIO_IN_BUFFER_NUM + 6;
-    #else
-    pcm_buffer_info.play_buffer_info.buffer_num = 4;
-    #endif
+    pcm_buffer_info.play_buffer_info.buffer_num = 12;
     pcm_buffer_info.play_buffer_info.block_size = block_size;
     pcm_buffer_info.play_buffer_info.buffer_size = pcm_buffer_info.play_buffer_info.block_size * pcm_buffer_info.play_buffer_info.block_num;
     pcm_buffer_info.play_buffer_info.pcm_buffer = pvPortMalloc(pcm_buffer_info.play_buffer_info.buffer_size * pcm_buffer_info.play_buffer_info.buffer_num);
@@ -555,5 +556,5 @@ void audio_pre_rslt_out_codec_init(void)
     cm_config_pcm_buffer(PLAY_PRE_AUDIO_CODEC_ID, CODEC_OUTPUT, &pcm_buffer_info);
     //配置IIS放音音频格式
     
-    cm_config_codec(PLAY_PRE_AUDIO_CODEC_ID, CODEC_OUTPUT, &pre_rslt_out_sound_info);
+    cm_config_codec(PLAY_PRE_AUDIO_CODEC_ID, CODEC_OUTPUT, &play_sound_info);
 }

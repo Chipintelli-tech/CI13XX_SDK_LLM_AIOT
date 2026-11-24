@@ -42,7 +42,6 @@ volatile int sys_err_flag = false;
 /**************************************************************************
                     function
 ****************************************************************************/
-void print_nn_err_cnt(void);
 
 static void send_audio_data_to_asr(uint32_t buf, uint32_t size)
 {
@@ -374,7 +373,7 @@ void audio_in_manage_inner_task(void *p)
 #endif
 
     vTaskSuspendAll();
-#if IF_USE_ANOTHER_CODEC_TO_GET_REF
+#if IF_USE_ANOTHER_CODEC_TO_GET_REF || AUDIO_DATA_PLAY_BY_IIS
     ref_in_codec_registe();
     cm_start_codec(REF_RECORD_CODEC_ID, CODEC_INPUT);
 #endif
@@ -411,11 +410,6 @@ void audio_in_manage_inner_task(void *p)
     int ref_data_block_size = AUDIO_CAP_POINT_NUM_PER_FRM / AUDIO_CAP_DIV_NUM * sizeof(int16_t);
 #endif
     ciss_set(CI_SS_AST_STATE, 0);
-    // cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT,  DISABLE);   //禁用alc，设置固定增益为20
-    // cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, 25);
-    // cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT,  DISABLE);
-    // cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, 25);
-
     for (;;)
     {
         uint32_t data_addr = 0, data_size;
@@ -425,17 +419,13 @@ void audio_in_manage_inner_task(void *p)
         uint32_t data_size_ref;
         cm_read_codec(REF_RECORD_CODEC_ID, &data_addr_ref, &data_size_ref); // 读取IIS0数据
 
-        print_nn_err_cnt();
+        print_bnpu_err_cnt();
         int16_t *data_p = (int16_t *)data_addr_ref;
         //  for(int i = 0; i < 16; i++)
         // {
         //     mprintf("%d ", data_p[i]);
         // }
-        // mprintf("\r\n");
-        // mprintf("%d %d %d\n",data_p[0],data_p[100],data_p[200]);
-        // init_timer0();
-        // timer0_start_count();
-        // ref_cnt++;
+
         if (!data_addr_ref)
         {
             continue;
@@ -456,7 +446,7 @@ void audio_in_manage_inner_task(void *p)
 #endif
 
         cm_read_codec(HOST_MIC_RECORD_CODEC_ID, &data_addr, &data_size);
-        print_nn_err_cnt();
+        print_bnpu_err_cnt();
         int asr_state = ciss_get(CI_SS_AST_STATE);
         int asr_warning = ciss_get(CI_SS_ASR_WARNING);
 
@@ -560,14 +550,22 @@ void audio_in_manage_inner_task(void *p)
     }
 }
 
-void print_nn_err_cnt(void)
+//打印bnpu端错误
+void print_bnpu_err_cnt(void)
 {
-    static int nn_err_cnt = 0;
-    int cnt = ciss_get(CI_SS_NN_OUT_ERR_CNT);
-    if (cnt != nn_err_cnt)
+    static uint32_t nn_err_cnt = 0;
+    static uint32_t audio_deal_err_cnt = 0;
+    uint32_t cnt = ciss_get(CI_SS_NN_OUT_ERR_CNT);
+    if(cnt != nn_err_cnt)
     {
-        ci_logwarn(CI_LOG_WARN, "CI_SS_ASR_WARNING[%d] = %d\n", 400, nn_err_cnt);
+        mprintf("ERR:CI_SS_ASR_WARNING[%d] = %d\n", 400, nn_err_cnt);
         nn_err_cnt = cnt;
+    }
+    cnt = ciss_get(CI_SS_AUDIO_DEAL_ERR_CNT);
+    if(cnt != audio_deal_err_cnt)
+    {
+        mprintf("ERR:audio deal too slow, lost %d frames, please set AUDIO_IN_BUFFER_NUM large, mem use large\n", audio_deal_err_cnt);
+        audio_deal_err_cnt = cnt;
     }
 }
 

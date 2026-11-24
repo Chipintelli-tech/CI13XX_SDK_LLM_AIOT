@@ -3,7 +3,11 @@
 #include "sed_manage.h"
 #include "sed_app_host.h"
 #include "prompt_player.h"
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
 #include "audio_play_process.h"
+#else
+#include "simple_audio_player.h"
+#endif
 #include "ci130x_gpio.h"
 #include "FreeRTOS.h"
 #include "system_msg_deal.h"
@@ -153,8 +157,13 @@ extern SedSnoreCloudCmdProtocolTypedef gSedSnoreCloudCmdProtocol;
 #endif
 void sed_rslt_out(void)
 {
+#if SIMPLE_AUDIO_PLAYER_ENABLE
+    uint32_t state = sap_get_state();
+    if (SAP_STATE_IDLE == state)
+#else
     uint32_t state = get_audio_play_state();
     if (AUDIO_PLAY_STATE_IDLE == state)
+#endif
     {
         sed_relt_flag = 0;
 

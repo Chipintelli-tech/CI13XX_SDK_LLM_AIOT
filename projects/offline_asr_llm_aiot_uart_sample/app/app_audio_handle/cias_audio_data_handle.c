@@ -21,6 +21,7 @@
 #include "system_msg_deal.h"
 #include "cwsl_app_handle.h"
 #include "cwsl_manage.h"
+#include "ci_flash_data_info.h"
 #if SIMPLE_AUDIO_PLAYER_ENABLE
 #include "simple_audio_player.h"
 #include "player_data_fetcher.h"
@@ -34,7 +35,6 @@
 #include "opus_private.h"
 #include "opus_defines.h"
 #endif
-#include "ota_config.h"
 static void play_done_callback(cmd_handle_t cmd_handle)
 {
 }
@@ -64,6 +64,17 @@ void get_vad_end_mute_frame(int param_index)
         break;
     }
 }
+static void play_end_callback() 
+{ 
+#if (PLAYER_CONTROL_PA)
+    audio_play_hw_pa_da_ctl(DISABLE,true);
+    gCiasAiotRunParam.pa_start_flag =false;
+    mprintf("pa_off\r\n");
+#else
+    audio_play_hw_pa_da_ctl(DISABLE,false);
+#endif
+}
+
 #if SIMPLE_AUDIO_PLAYER_ENABLE
 void opus_data_decode_task(void *parameter)
 {
@@ -128,10 +139,6 @@ void opus_data_decode_task(void *parameter)
     }
 #endif
 }
-static void play_end_callback() 
-{ 
-}
-
 static void data_request_callback(int32_t data_size) 
 {
     uint32_t request_len = data_size;
@@ -140,7 +147,6 @@ static void data_request_callback(int32_t data_size)
     update_awake_time();
 }
 #else
-//该任务当前版本暂未使用
 void pcm_data_play_task(void *parameter)
 {
 #if NET_AUDIO_PLAY_BY_PCM || NET_AUDIO_PLAY_BY_OPUS
@@ -158,11 +164,12 @@ void pcm_data_play_task(void *parameter)
                 //mprintf("rx_pcm_play_size = %d\r\n", rx_pcm_play_size);
                 cm_get_pcm_buffer(PLAY_CODEC_ID, &write_pcm_addr_cpy, 100); // TODO HSL
                 int8_t *pData = (int8_t *)write_pcm_addr_cpy;
-                for (int i = 0; i < rx_pcm_play_size; i++)    // 数据复制一分进行播放，不复制会出现音频播放加快
-                {
-                    pData[2 * i] = pcm_play_buffer[i];
-                    pData[2 * i + 1] = pcm_play_buffer[i];
-                }
+                // for (int i = 0; i < rx_pcm_play_size; i++)    // 数据复制一分进行播放，不复制会出现音频播放加快
+                // {
+                //     pData[2 * i] = pcm_play_buffer[i];
+                //     pData[2 * i + 1] = pcm_play_buffer[i];
+                // }
+                memcpy(pData,pcm_play_buffer,rx_pcm_play_size);
                 if (0 == write_pcm_addr_cpy)
                 {
                     mprintf("write_pcm_addr_cpy error...\r\n");
@@ -207,7 +214,7 @@ void pcm_data_play_task(void *parameter)
 int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
 {
     int32_t ret = RETURN_OK;
-    static uint8_t ans_cmd_buf[3] = {0};
+    static uint8_t ans_cmd_buf[6] = {0};
 #if NET_AUDIO_PLAY_BY_OPUS
     static uint8_t opus_play_data[REQUEST_ONE_FRAME_SEZIE];
     memset(opus_play_data, 0, REQUEST_ONE_FRAME_SEZIE);
@@ -538,23 +545,33 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         break;
     case NET_PLAY_START:
         mprintf("NET_PLAY_START.......\r\n");
-#if USE_CWSL
-        uint16_t timeout_cnt =0;
-        extern cwsl_app_t cwsl_app;
-        if (ciss_get(CI_SS_START_SLEEP_PROCESS) == 0 && cwsl_app.app_mode == CWSL_APP_REG)
+        if (!gCiasAiotFuncParam.upload_play_full_duplex)
         {
-            /*半双工时，云端退出自学习需提前关闭VAD*/
-            if (!gCiasAiotFuncParam.upload_play_full_duplex)
+            ciss_set(CI_SS_VOX_VAD_CLEAR, 1);
+            ciss_set(CI_SS_VOX_WORK_STATE, 0); // 关闭vad计算
+            if(gCiasAiotRunParam.is_vad_on_flag)
             {
-                ciss_set(CI_SS_VOX_WORK_STATE, 0); // 关闭vad计算
+                gCiasAiotRunParam.is_vad_on_flag =false;
+                mprintf("\r\n---vad end---\r\n");
+                cias_aiot_vad_end_handle(0x0);
+            }
+            else
+            {
                 gCiasAiotRunParam.stop_collect_pcm_flag = true;
                 gCiasAiotRunParam.compress_pcm_to_wifi_flag = false;
                 gCiasAiotRunParam.upload_pcm_to_wifi_flag = false;
-    #if NET_AUDIO_PLAY_BY_MP3
                 xStreamBufferReset(gCiasAiotRunParam.pcm_compress_stream_buffer);
+                #if !AUDIO_COMPRESS_RECORD_DISABLE
                 xQueueReset(gCiasAiotRunParam.pcm_upload_queue);
-    #endif
+                #endif
             }
+
+        }
+#if USE_CWSL
+        uint16_t timeout_cnt =0;
+        extern cwsl_app_t cwsl_app;
+        if (ciss_get(CI_SS_START_SLEEP_PROCESS) == 0 && cwsl_app.app_mode != CWSL_APP_REC)
+        {
             #if USE_AEC_MODULE
             ciss_set(CI_SS_CWSL_AEC_MUTE_STATE,CI_SS_CWSL_AEC_MUTE_OFF);
             #endif
@@ -567,8 +584,8 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
             #if	SIMPLE_AUDIO_PLAYER_ENABLE
             while(sap_get_state() != SAP_STATE_IDLE && timeout_cnt<1000)
             #else
-            //老播放器播放任务收到并处理停止事件需要时间
-            while(AUDIO_PLAY_STATE_IDLE != get_audio_play_state() || timeout_cnt<1000)
+            vTaskDelay(pdMS_TO_TICKS(2));            //老播放器播放任务收到并处理停止事件需要时间
+            while(AUDIO_PLAY_STATE_IDLE != get_audio_play_state() && timeout_cnt<1000)
             #endif
             {
                 timeout_cnt++;
@@ -585,16 +602,17 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
             gCiasAiotRunParam.cloud_play_state = CLOUD_PLAY_START;
             gCiasAiotRunParam.request_play_data_flag = false;
             #if NET_AUDIO_PLAY_BY_G722
+            pdf_cloud_pre_init(8192);
             sap_play_stream("g722", 8192, REQUEST_ONE_FRAME_SEZIE, play_end_callback, data_request_callback);
-            pdf_cloud_pre_init(8192);
             #elif NET_AUDIO_PLAY_BY_PCM
-            sap_play_stream("pcm", 8192, REQUEST_ONE_FRAME_SEZIE, play_end_callback, data_request_callback);
             pdf_cloud_pre_init(8192);
+            sap_play_stream("pcm", 8192, REQUEST_ONE_FRAME_SEZIE, play_end_callback, data_request_callback);
             #elif NET_AUDIO_PLAY_BY_MP3
+            pdf_cloud_pre_init(4096);//比特率大于128kbps，建议使用8192
             sap_play_stream("MP3", 4096, REQUEST_ONE_FRAME_SEZIE, play_end_callback, data_request_callback);
-            pdf_cloud_pre_init(4096);
             #endif
-
+            data_request_callback(REQUEST_ONE_FRAME_SEZIE);
+            data_request_callback(REQUEST_ONE_FRAME_SEZIE);
         }
 #else		
         #if NET_AUDIO_PLAY_BY_MP3	
@@ -630,18 +648,6 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         gCiasAiotRunParam.play_cloud_end_flag = false;
         gCiasAiotRunParam.request_play_count = 0;
 		gCiasAiotRunParam.request_play_try_count = 0;
-        if (!gCiasAiotFuncParam.upload_play_full_duplex)
-        {
-            ciss_set(CI_SS_VOX_WORK_STATE, 0); // 关闭vad计算
-            gCiasAiotRunParam.stop_collect_pcm_flag = true;
-            gCiasAiotRunParam.compress_pcm_to_wifi_flag = false;
-            gCiasAiotRunParam.upload_pcm_to_wifi_flag = false;
-#if NET_AUDIO_PLAY_BY_MP3
-            xStreamBufferReset(gCiasAiotRunParam.pcm_compress_stream_buffer);
-            xQueueReset(gCiasAiotRunParam.pcm_upload_queue);
-#endif
-        }
-
         break;
     case NET_PLAY_END:
         if (!gCiasAiotRunParam.is_vad_on_flag)
@@ -657,8 +663,13 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
     case PLAY_DATA_RECV:
         mprintf("pheader->len = %d\r\n", pheader->len);
         gCiasAiotRunParam.request_play_try_count = 0; // 清除超时参数
+#if	SIMPLE_AUDIO_PLAYER_ENABLE
+        if (!gCiasAiotRunParam.play_cloud_end_flag && (gCiasAiotRunParam.cloud_play_state != CLOUD_PLAYING_DATA_WITING_TIMEOUT 
+            &&gCiasAiotRunParam.cloud_play_state != CLOUD_PLAY_END))
+#else
         if (!gCiasAiotRunParam.play_cloud_end_flag)
-        { 
+#endif
+        {
             if (pheader->len > 0)
             {
 #if	SIMPLE_AUDIO_PLAYER_ENABLE
@@ -671,7 +682,7 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
                 {
                     mprintf("outside_write_stream write fail...\r\n");
                 }
-                play_with_outside(0, "mp3", NULL);
+                play_with_outside(0, "mp3", play_end_callback);
 #endif
 #if NET_AUDIO_PLAY_BY_PCM
                 int rx_pcm_play_size = xStreamBufferSend(gCiasAiotRunParam.pcm_play_data_stream_buffer, (uint32_t)(msg_buf + msg_offset), pheader->len, pdMS_TO_TICKS(1000));
@@ -713,7 +724,6 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         {
 		    pdf_push_data((uint8_t*)(msg_buf + msg_offset), pheader->len, pdMS_TO_TICKS(1000));
         }
-        gCiasAiotRunParam.cloud_play_state = CLOUD_PLAY_END;
 #else   //精简播放器数据请求任务在播放结束后不能立刻释放,由play_cloud_end_flag控制
         gCiasAiotRunParam.request_play_data_flag = false;
 #if NET_AUDIO_PLAY_BY_MP3
@@ -858,10 +868,19 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
     case CIAS_AUDIO_RST:
         dpmu_software_reset_system_config();
         break;
+    case CIAS_GET_SOFT_VER:
+    {
+        product_version_t fw_version;
+        get_fw_version(&fw_version);
+        ans_cmd_buf[3] = (fw_version.soft_ware_version >> 16) & 0xff;
+        ans_cmd_buf[4] = (fw_version.soft_ware_version >> 8) & 0xff;
+        ans_cmd_buf[5] = fw_version.soft_ware_version & 0xff;
+        break;
+    }
 #if CI_OTA_ENABLE 
     case CIAS_OTA_START:
         mprintf("enter OTA MODE !!!\r\n");
-        write_ota_mcu_status(1);
+        write_ota_mcu_status(0x05);
 		dpmu_software_reset_system_config();
 		break;
 #endif
@@ -959,9 +978,11 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         gCiasAiotRunParam.cloud_parse_is_busy_flag = false;
         break;
     #if USE_CWSL
-	case CWSL_UART_REGISTRATION_WAKE: /*开始学习*/
+	case CWSL_UART_REGISTRATION_WAKE: /*学习唤醒词*/
+    case CWSL_UART_REGISTRATION_CMD:  /*学习命令词*/
     case CWSL_UART_EXIT_REGISTRATION: /*退出学习*/
     case CWSL_UART_DELETE_WAKE:       /*删除唤醒词*/
+    case CWSL_UART_DELETE_CMD:        /*删除命令词*/
         mprintf("CWSL_UART_REGISTRATION %X\r\n", wifi_cmd);
         if(get_wakeup_state() != SYS_STATE_WAKEUP)
         {
@@ -992,7 +1013,14 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         break;
     }
     ans_cmd_buf[2] = 0x01;   //执行成功
-    cias_send_cmd_and_data(CIAS_CMD_EXEC_STATE, ans_cmd_buf, 3, DEF_FILL);
+    if(wifi_cmd == CIAS_GET_SOFT_VER)
+    {
+        cias_send_cmd_and_data(CIAS_CMD_EXEC_STATE, ans_cmd_buf, 6, DEF_FILL);
+    }
+    else
+    {
+        cias_send_cmd_and_data(CIAS_CMD_EXEC_STATE, ans_cmd_buf, 3, DEF_FILL);
+    }
     return 0;
 PARSE_WIFI_MSG_ERR:
     mprintf("parse wifi msg error:pheader-len = %d\r\n", pheader->len);
@@ -1101,8 +1129,8 @@ void request_play_data_task(void *parameter)
 #endif
 bool cias_online_func_init(void)
 {
-    network_uart_port_init();   //配置交互串口参数
     get_vad_end_mute_frame(gCiasAiotFuncParam.vad_end_mute_param_index); // 获取vad静音产生的帧数
+#if AUDIO_DATA_PLAY_BY_UART
 #if !SIMPLE_AUDIO_PLAYER_ENABLE
     #if NET_AUDIO_PLAY_BY_MP3
     if(!audio_player_param_init())
@@ -1132,6 +1160,8 @@ bool cias_online_func_init(void)
     }
     #endif
 #endif
+#endif
+#if WIFI_CMD_BY_UART || AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_UPLOAD_BY_UART
     if (!xTaskCreate(network_recv_data_task, "network_recv_data_task", 512, NULL, 4, NULL)) // 接收WiFi数据任务
     {
         mprintf("error %s  %d\n", __func__, __LINE__);
@@ -1142,6 +1172,7 @@ bool cias_online_func_init(void)
         mprintf("error %s  %d\n", __func__, __LINE__);
         return false;
     }
+    network_uart_port_init();   //配置交互串口参数
     if (!voice_upload_task_init())
     {
         mprintf("error %s  %d\n", __func__, __LINE__);
@@ -1157,17 +1188,11 @@ bool cias_online_func_init(void)
         mprintf("error %s  %d\n", __func__, __LINE__);
         return false;
     }
+#endif
     return true;
 }
-cinv_item_ret_t write_ota_mcu_status(bool status)
+cinv_item_ret_t write_ota_mcu_status(uint8_t status)
 {
-    ota_nv_status_t ota_nv_status;
-    ota_nv_status.status = status;
-    ota_nv_status.ota_chip_type_1306 = OTA_CHIP_TYPE_1306;
-    ota_nv_status.timeout = OTA_TIMOUT;
-    ota_nv_status.retry_time = OTA_RETRY_TIME;
-    ota_nv_status.log_uart_number = CONFIG_CI_LOG_UART;
-    ota_nv_status.ota_uart_number = UART_NUM_SEND_PLAY_AUDIO_NUMBER;
-    ota_nv_status.ota_uart_baud = UART_NUM_SEND_PLAY_AUDIO_BAUDRATE;
-	return cinv_item_write(NVDATA_ID_OTA_MCU_STATUS, sizeof(ota_nv_status_t), &ota_nv_status);
+    uint8_t flag = status;
+	return cinv_item_write(NVDATA_ID_OTA_MCU_STATUS, sizeof(uint8_t), &flag);
 }

@@ -770,20 +770,25 @@ int cm_stop_codec(int codec_index, io_direction_t io_dir)
     {
         void * pcm_buffer;
         BaseType_t rst;
-
-        // 已写入busy queue的buffer转移到idle queue
-        while((rst = xQueueReceive(cm.codec_info[codec_index].play_buffer_queue.busy_queue, &pcm_buffer, 5)) == pdTRUE)
+        // 若在ISR中调用该接口，需确保busy queue已经清空再调用cm_stop_codec
+        // 已写入busy queue的buffer转移到idle queue；
+        if(!check_curr_trap())
         {
-            xQueueSend(cm.codec_info[codec_index].play_buffer_queue.idle_queue, &pcm_buffer, 5);
+            while((rst = xQueueReceive(cm.codec_info[codec_index].play_buffer_queue.busy_queue, &pcm_buffer, 5)) == pdTRUE)
+            {
+                xQueueSend(cm.codec_info[codec_index].play_buffer_queue.idle_queue, &pcm_buffer, 5);
+            }
         }
 
         // 等待硬件正在播放的buffer播放完成，转入idle queue
-        while(uxQueueMessagesWaiting(cm.codec_info[codec_index].play_buffer_queue.idle_queue) != cm.codec_info[codec_index].play_buffer_info.buffer_num)
+        if(!check_curr_trap())
         {
-            // mprintf("idle queue buffer count: %d\n", uxQueueMessagesWaiting(cm.codec_info[codec_index].play_buffer_queue.idle_queue));
-            vTaskDelay(1);
+            while(uxQueueMessagesWaiting(cm.codec_info[codec_index].play_buffer_queue.idle_queue) != cm.codec_info[codec_index].play_buffer_info.buffer_num)
+            {
+                // mprintf("idle queue buffer count: %d\n", uxQueueMessagesWaiting(cm.codec_info[codec_index].play_buffer_queue.idle_queue));
+                vTaskDelay(1);
+            }
         }
-
         codec_info_t * code_info_p = &(cm.codec_info[codec_index]);
         IISDMA_TypeDef* IISDMAx = IISDMA0;
         iis_base_t IISx = code_info_p->codec_hw_info.output_iis.IISx;
@@ -1014,6 +1019,20 @@ int cm_set_codec_alc(int codec_index, cm_cha_sel_t cha, FunctionalState alc_enab
     }
 }
 
+/**
+ * @brief CODEC ADC ALC开关状态读取的接口
+ * 
+ * @param codec_index CODEC编号
+ * @param cha 左声道或者右声道，不可以双声道
+ * @return int 1：ALC开 0：ALC关
+ */
+int cm_get_codec_alc_state(int codec_index, cm_cha_sel_t cha)
+{
+    if (cm.codec_info[codec_index].codec_hw_info.codec_if.codec_ioctl)
+    {
+        return cm.codec_info[codec_index].codec_hw_info.codec_if.codec_ioctl(CODEC_INPUT, CM_IOCTRL_ALC_STATE_GET, cha,0);
+    }
+}
 
 int cm_set_codec_dac_enable(int codec_index, int channel, FunctionalState en)
 {

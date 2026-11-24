@@ -5,13 +5,15 @@
  * @LastEditTime: 2023-05-15 14:46:08
  * @Description: 
  */
-#include "audio_play_api.h"
 #include "cias_voice_plyer_handle.h"
-#include "audio_play_api.h"
+
 #include "cias_audio_data_handle.h"
 #include "status_share.h"
 
 media_play_resume_control media_play;
+
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
+#include "audio_play_api.h"
 audio_play_os_stream_t tts_player = NULL;
 audio_play_os_sem_t tts_player_end = NULL;
 
@@ -23,7 +25,7 @@ audio_play_os_sem_t m4a_player_end = NULL;
 
 audio_play_os_stream_t wav_player = NULL;
 audio_play_os_sem_t wav_player_end = NULL;
-
+#endif
 net_player_status_t tts_player_status = NET_PLAYER_IDLE;
 net_player_status_t mp3_player_status = NET_PLAYER_IDLE;
 net_player_status_t m4a_player_status = NET_PLAYER_IDLE;
@@ -182,7 +184,7 @@ void set_next_resume_play_data(uint8_t *next_data)
         memset(next_resume_play_data, 0, 8);
     }
 }
-
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
 void stop_net_player(void)
 {
     outside_send_end_sem(tts_player_end);
@@ -195,7 +197,7 @@ void clear_net_player_stopsem(void)
 {
     outside_clear_stream(NULL, m4a_player_end);
 }
-
+#endif
 
 /**
  * @brief Set the net play type object
@@ -216,7 +218,7 @@ net_player_type_t get_net_play_type()
     return net_play_type;
 }
 
-
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
 static bool rev_voice_end_flag = false;
 void mp3_player_end_callbk(int32_t play_cb_state)
 {
@@ -270,7 +272,7 @@ void mp3_player_end_callbk(int32_t play_cb_state)
         } 
     }
 }
-
+#endif
 void m4a_player_end_callbk(int32_t play_cb_state)
 {
 #if USE_AAC_DECODER
@@ -333,7 +335,7 @@ void m4a_player_end_callbk(int32_t play_cb_state)
     }
 #endif
 }
-
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
 void wav_player_end_callbk(int32_t play_cb_state)
 {
     set_net_player_status(PLAY_WAV, NET_PLAYER_IDLE);
@@ -414,7 +416,7 @@ void tts_player_end_callbk(int32_t play_cb_state)
         cias_send_cmd(NET_PLAY_RESTART, DEF_FILL);
     }
 }
-
+#endif
 int32_t pause_net_music(bool from_isr_flag)
 {
     BaseType_t pxHigherPriorityTaskWoken;
@@ -460,9 +462,10 @@ bool is_net_player(void)
 * 播报器参数初始化
 * 
 * * * **/
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
 bool audio_player_param_init(void)    
 {
-    outside_init_stream(&mp3_player, &mp3_player_end, 1024);
+    outside_init_stream(&mp3_player, &mp3_player_end, AIOT_AUDIO_PLAY_BUF_SIZE);
     if (!mp3_player)
     {
         mprintf("mp3_player alloc error %x\n", mp3_player);
@@ -475,4 +478,5 @@ bool audio_player_param_init(void)
     set_curr_outside_handle(mp3_player, mp3_player_end);
     return true;
 }
+#endif
 #endif

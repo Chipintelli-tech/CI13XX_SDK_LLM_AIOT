@@ -16,8 +16,6 @@
 #include "ci130x_spiflash.h"
 #include "ci130x_gpio.h"
 #include "ci130x_dma.h"
-#include "audio_play_api.h"
-#include "audio_play_decoder.h"
 #include "ci_flash_data_info.h"
 // #include "ci130x_audio_capture.h"
 #include "board.h"
@@ -46,10 +44,14 @@
 #include "code_switch.h"
 #include "ci_nlp_user.h"
 #include "ci_nlp.h"
-#include "ota_config.h"
 #include "cias_network_msg_protocol.h"
 #include "timers.h"
 #include "ci_agc.h"
+#include "user_config.h"
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
+#include "audio_play_api.h"
+#include "audio_play_decoder.h"
+#endif
 /**
  * @brief 硬件初始化
  *          这个函数主要用于系统上电后初始化硬件寄存器到初始值，配置中断向量表初始化芯片io配置时钟
@@ -325,7 +327,6 @@ static void task_init(void *p_arg)
     ciss_set(CI_SS_NN_DENOISE_WORK_STATE, 1);
     ciss_set(CI_SS_VOX_SET_END_CONFIDENCE, VOX_VAD_END_CONFIDENCE_DEFAULT);
     ciss_set(CI_SS_ALG_DEBUG_STATE, 0);  //开启前端算法调试
-	ciss_set(CI_SS_AEC_DEALY_HANDLE_FRAME, 60);
     extern vox_config_t vox_config;
     uint8_t vox_thre_db = VOX_VAD_THRE_DB_DEFAULT;
     if(vox_thre_db >= 45 && vox_thre_db <= 48)
@@ -406,8 +407,12 @@ static void task_init(void *p_arg)
     #endif
     xTaskCreate(audio_in_manage_inner_task, "audio_in_manage_inner_task", 300, NULL, 4, NULL);
     #if AUDIO_PLAYER_ENABLE
+    #if SIMPLE_AUDIO_PLAYER_ENABLE
+    sap_init();
+    #else
     /* 播放器任务 */
     audio_play_init();
+    #endif
     #endif
     alg_model_init();     //初始化算法模型
     #if USE_AI_DOA

@@ -494,8 +494,3 @@ include-path: components/tts/ringbuffer
 
 //factory ir_test
 include-path: components/factory_test/
-//ota
-include-path: projects/offline_asr_llm_aiot_uart_sample/app/app_ota/
-source-file: projects/offline_asr_llm_aiot_uart_sample/app/app_ota/ota_fun.c
-source-file: projects/offline_asr_llm_aiot_uart_sample/app/app_ota/ota_process.c
-source-file: projects/offline_asr_llm_aiot_uart_sample/app/app_ota/ota_uart_protocol.c

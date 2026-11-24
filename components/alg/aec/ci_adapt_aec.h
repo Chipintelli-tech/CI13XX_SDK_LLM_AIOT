@@ -33,7 +33,7 @@ typedef struct
     
     float aec_gain;//增益数值
     float aec_enable_threshold;//门限值
-    float aec_mic_div_ref_thr;//AEC门限基础值,参考与麦克风幅值比值
+    //float aec_mic_div_ref_thr;//AEC门限基础值,参考与麦克风幅值比值
     int alc_off_codec_adc_gain_mic; 
     int alc_off_codec_adc_gain_ref;
     

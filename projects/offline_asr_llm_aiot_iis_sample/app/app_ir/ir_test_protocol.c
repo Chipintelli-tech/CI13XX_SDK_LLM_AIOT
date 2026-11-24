@@ -13,7 +13,11 @@
 #include "ci130x_spiflash.h"
 #include "ci130x_dpmu.h"
 #include "prompt_player.h"
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
 #include "audio_play_api.h"
+#else
+#include "simple_audio_player.h"
+#endif
 #include "asr_api.h"
 #include "firmware_updater.h"
 #include <string.h>

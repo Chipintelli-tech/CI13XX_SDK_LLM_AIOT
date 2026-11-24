@@ -11,9 +11,9 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #define USE_CI_D02GS01J_BOARD       0   //CI-D0XGS01J，端子模块，芯片型号必须设置为1302
 #define USE_CI_D02GS02S_BOARD       0   //CI-D0XGS02S，SMT模块，芯片型号必须设置为1302
 #define USE_CI_D12GS01J_BOARD       0   //CI-D0XGS01J，端子模块，芯片型号必须设置为1312JE
-#define USE_CI_D06GT01D_BOARD       0   //CI-D06GT01D，开发版，芯片型号必须设置为1306
+#define USE_CI_D06GT01D_BOARD       1   //CI-D06GT01D，开发版，芯片型号必须设置为1306
 #define USE_CI_E12GS02J_BOARD       0   //CI-E12GS02J，开发版，芯片型号必须设置为231x
-#define USE_CI_D06GT01J_BOARD       1   //CI_D06GT01J, 开发板，型号必须为设置1306-仅配置支持双mic 算法+AEC，其他配置不支持
+#define USE_CI_D06GT01J_BOARD       0   //CI_D06GT01J, 开发板，型号必须为设置1306-仅配置支持双mic 算法+AEC，其他配置不支持
 #define USE_CI_E0XGTD02S_BOARD      0   //CI-E06GT02S, 开发板2305/2306
 #define USE_CUS_XXXXXXX_BOARD       0   //用户自定义
 
@@ -54,16 +54,9 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 
 //**IIS采音功能开关配置
 #define USE_IIS1_OUT_PRE_RSLT_AUDIO    0   //1,开启IIS采音功能,可以使用采音板采音,占用PA2~PA6。会多消耗20KB SYS内存 0,关闭IIS采音功能,PA2~PA6可以用于其它功能。
-#define USE_HP_OUT_PRE_RSLT_AUDIO      1
             
 //**通讯串口配置
 #define CONFIG_CI_LOG_UART             HAL_UART0_BASE  //配置log输出使用的串口，请勿与protocol共用同一个串口
-
-#define MSG_COM_USE_UART_EN            0   //0,关闭语音模块通讯协议。1,开启语音模块通讯协议。
-#define UART_PROTOCOL_NUMBER           (HAL_UART2_BASE)    //语音模块协议使用的串口，请勿与log共用同一个串口。
-#define UART_PROTOCOL_BAUDRATE         (UART_BaudRate921600) //语音模块协议使用的串口波特率。
-#define UART_PROTOCOL_VER              2   //语音模块协议版本号:1,一代协议。2,二代协议，255,平台生成协议
-
 
 #define CLOUD_UART_PROTOCOL_EN         0   //云端协议使能-只有在启英开发者平台做固件配协议能用
 #if CLOUD_UART_PROTOCOL_EN
@@ -79,17 +72,8 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #define UART1_PAD_OPENDRAIN_MODE_EN     0   //0,UART1为推挽模式。1,UART1为开漏模式。
 #define UART2_PAD_OPENDRAIN_MODE_EN     0   //0,UART2为推挽模式。1,UART2为开漏模式。
 
-//**OTA配置 当前版本不支持
-#define OTA_TIMOUT                  3 //数据超时时间，单位秒
-#define OTA_RETRY_TIME              10//数据重复发送次数
-#if (USE_CI_D06GT01D_BOARD == 1)
-#define OTA_CHIP_TYPE_1306          1
-#elif (USE_CI_D06GT01J_BOARD == 1)
-#define OTA_CHIP_TYPE_1306          1
-#else
-#define OTA_CHIP_TYPE_1306          0
-#endif  
-
+// ota使能
+#define CI_OTA_ENABLE                   0   // 1使能 0 不使能 
 
 //**时钟源配置
 #ifndef USE_EXTERNAL_CRYSTAL_OSC
@@ -120,8 +104,16 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 /********************************************离在线参数宏配置开始********************************************/
 //*语音上传(通过HPOUT输出)
 #ifndef AUDIO_DATA_UPLOAD_BY_HPOUT
-#define AUDIO_DATA_UPLOAD_BY_HPOUT                      (1)            //通过串口上传语音功能配置，消耗75KB内存
+#define AUDIO_DATA_UPLOAD_BY_HPOUT                      (1)            //通过串口上传语音功能配置，消耗8KB内存
 #endif
+
+#define WIFI_CMD_BY_UART                                (1)            //通过串口和wifi指令交互配置
+
+#if AUDIO_DATA_UPLOAD_BY_HPOUT
+#define USE_HP_OUT_PRE_RSLT_AUDIO      1
+#endif
+
+#define HPOUT_UPLOAD_IS_WAKEUP                            1            //1:唤醒后开始录音 0：上电后开始录音不结束
 
 #define  AUDIO_VAD_CHECK_ENABLE                           0            //vad 检测使能-不可修改
 
@@ -129,18 +121,27 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #define AUDIO_COMPRESS_RECORD_DISABLE                     1            //PCM上传数据，不做数据压缩
 //和WiFi交互是否带协议头
 #define AUDIO_SEND_WITH_PROTOCOL_HEADER                   1            //1-带协议头上传(默认) 0-不带协议直接传裸数据-调试使用
-
-#define USE_HP_OUT_NET_AUDIO                              1             //使用hpout直接输出云端音频          
+      
 #define AUDIO_PLAY_MODE                                   1             //1-支持打断当前播放 0-不支持，顺序播放-暂时不用
 #define UPLOAD_NNDENOISE_AUDIO_DATA_ENABLE                1             //1-上传降噪的音频 0-上传非降噪的音频
 
+#define LOCAL_REC_VAD_END_ENABLE                          0             //本地识别后立即停止VAD
+#define WEAK_VAD_ENABLE                                   0             //1：唤醒后开始检测VAD  0：一直检测VAD
 
+//VAD算法内部是否进行超时检测
+#define VAD_TIMEOUT_CHECK                                 1            //0-不进行超时检测 1-进行超时检测-不可修改
+//强制结束录音时间
+#define VAD_FORCE_OVER_NUM_TIME                           5            //强制结束录音的时间(单位S)，上传音频 
+
+#if WIFI_CMD_BY_UART
 //和WiFi通信串口及参数配置
 #define UART_NUM_SEND_PLAY_AUDIO_NUMBER                  HAL_UART1_BASE           //网络端交互的串口
 #define UART_NUM_SEND_PLAY_AUDIO_BAUDRATE                UART_BaudRate921600      //网络端交互的串口波特率
+#endif
 #define NETWORK_RECV_BUFF_MAX_SIZE                       (256 + 16)               //接收网络端串口数据最大size-帧头+预留4字节
 #define NETWORK_SEND_BUFF_MAX_SIZE                       (256 + 16)               //发送串口数据到网络端最大size,pcm数据分4包传输，避免丢数据
 #define NETWORK_SEND_BUFF_NUM                             5                       //发送串口数据到网络端缓冲区个数  
+
 
 //生产测试使用
 #define IIS_CHANNEL_ENG_CALC_EANBLE                       0              //iis通道能量计算
@@ -208,6 +209,11 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #endif
 #endif
 
+//离在线主要使用与WIFI通信的串口，根据需求增加该串口
+#define MSG_COM_USE_UART_EN            0   //0,关闭语音模块通讯协议。1,开启语音模块通讯协议。
+#define UART_PROTOCOL_NUMBER           (HAL_UART2_BASE)    //语音模块协议使用的串口，请勿与log共用同一个串口。
+#define UART_PROTOCOL_BAUDRATE         (UART_BaudRate921600) //语音模块协议使用的串口波特率。
+#define UART_PROTOCOL_VER              2   //语音模块协议版本号:1,一代协议。2,二代协议，255,平台生成协议
 
 #define BF_DEEPSE_MODE                  1   //1:全深度分离更耗内存(单双网络都可以用) 0：半深度分离(唤醒词做深度分离，命令词不做，只能用双网络)
 #define BF_ASR_VALID_MODE               0   //1:开启ASR打分是否有效判断功能 0：关闭ASR打分是否有效判断功能 该功能只针对全深度分离和半深度分离

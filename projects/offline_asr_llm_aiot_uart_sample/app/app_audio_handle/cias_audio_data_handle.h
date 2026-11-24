@@ -22,5 +22,5 @@ bool cias_online_func_init(void);
 bool audio_player_param_init(void);
 void request_play_data_func(void);
 #endif
-cinv_item_ret_t write_ota_mcu_status(bool status);
+cinv_item_ret_t write_ota_mcu_status(uint8_t status);
 #endif   //__CIAS_AUDIO_DATA_HANDLE_H__

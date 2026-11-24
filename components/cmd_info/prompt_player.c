@@ -80,7 +80,14 @@ bool get_mute_voice_in_state( void )
 {
     return prompt_player.mute_voice_in_flag;
 }
-
+//检查是否是组合播报,并且后续有播报词
+bool check_combination_index_state(void)
+{
+    if (prompt_player.combination_index < prompt_player.combination_number)
+    return true;
+    else
+    return false;
+}
 static void combination_callback(int32_t play_cb_state);
 
 static void pop_from_play_queue()
@@ -108,6 +115,14 @@ static void clean_play_queue()
             voice_play_info.play_done_callback(voice_play_info.cmd_handle);
         }
     }
+    #if (PLAYER_CONTROL_PA)
+    audio_play_hw_pa_da_ctl(DISABLE,true);
+    extern CiasAiotRunParamTypedef gCiasAiotRunParam;
+    gCiasAiotRunParam.pa_start_flag =false;
+    mprintf("pa_off\r\n");
+    #else
+    audio_play_hw_pa_da_ctl(DISABLE,false);
+    #endif
     prompt_player.combination_number = 0;
     prompt_player.combination_index = 0;
 }
@@ -149,14 +164,6 @@ static int prompt_play_inner(voice_play_info_t *p_voice_play_info, bool from_cal
             prompt_player.combination_number = combination_number;
             prompt_player.combination_index = 0;
 
-            /*audio PA on*/
-            // #if (PLAYER_CONTROL_PA)
-            // //audio_play_hw_start(ENABLE);
-            // audio_play_hw_pa_da_ctl(ENABLE,true);
-            // vTaskDelay(pdMS_TO_TICKS(100));
-            // #else
-            // audio_play_hw_pa_da_ctl(ENABLE,false);
-            // #endif
 			#if SIMPLE_AUDIO_PLAYER_ENABLE
 			sap_play(prompt_player.combination_list[prompt_player.combination_index++], combination_callback);
 			#else
@@ -171,95 +178,6 @@ static int prompt_play_inner(voice_play_info_t *p_voice_play_info, bool from_cal
     }
     return 0;
 }
-#if 0
-void pause_asr(uint8_t voice_in_mute)
-{
-    #if !NO_ASR_FLOW
-    //xSemaphoreTake(muteMutex, portMAX_DELAY);
-    if (prompt_player.pause_asr_count == 0)
-    {
-        #if USE_AEC_MODULE
-		if(voice_in_mute) //oneshot时，命令词不做AEC，唤醒词做AEC
-		{
-	        #if PAUSE_VOICE_IN_WITH_PLAYING
-	        {
-	            prompt_player.mute_voice_in_flag = true;
-	            cm_set_codec_mute(HOST_MIC_RECORD_CODEC_ID,CODEC_INPUT,1,ENABLE);//TODO 要修改
-	            ciss_set(CI_SS_MIC_VOICE_STATUE,CI_SS_MIC_VOICE_MUTE);
-	            // asrtop_asr_system_pause();
-	        }
-	        #endif
-		}
-        #else
-        #if PAUSE_VOICE_IN_WITH_PLAYING
-        prompt_player.mute_voice_in_flag = true;
-        cm_set_codec_mute(HOST_MIC_RECORD_CODEC_ID,CODEC_INPUT,1,ENABLE);//TODO 要修改
-        ciss_set(CI_SS_MIC_VOICE_STATUE,CI_SS_MIC_VOICE_MUTE);
-        asrtop_asr_system_pause();
-        #endif
-        #endif
-
-        #if USE_AEC_MODULE
-        ciss_set(CI_SS_INTERCEPT_ASR_OUT, 1);
-        #endif
-    }
-    prompt_player.pause_asr_count++;
-    #endif
-    //xSemaphoreGive(muteMutex);
-}
-#endif
-
-#if 0
-/**
- * @brief resume voice in, so can recover ASR, call this after play done,
- *
- */
-void  resume_asr(uint8_t voice_in_mute)
-{
-    #if !NO_ASR_FLOW
-    //xSemaphoreTake(muteMutex, portMAX_DELAY);    
-    if (prompt_player.pause_asr_count > 0)
-    {
-        prompt_player.pause_asr_count--;
-        if (prompt_player.pause_asr_count == 0)
-        {
-            #if USE_AEC_MODULE
-			if(voice_in_mute) //oneshot时，命令词不做AEC，唤醒词做AEC
-            {
-	            #if PAUSE_VOICE_IN_WITH_PLAYING
-	            // if (ciss_get(CI_SS_CWSL_IN_REG))
-	            {
-	                cm_set_codec_mute(HOST_MIC_RECORD_CODEC_ID,CODEC_INPUT,1,DISABLE);//TODO 要修改
-	                ciss_set(CI_SS_MIC_VOICE_STATUE,CI_SS_MIC_VOICE_NORMAL);
-	                // asrtop_asr_system_continue();
-	                prompt_player.mute_voice_in_flag = false;
-	            }
-            #endif
-            }
-            #else
-            #if PAUSE_VOICE_IN_WITH_PLAYING
-            cm_set_codec_mute(HOST_MIC_RECORD_CODEC_ID,CODEC_INPUT,1,DISABLE);//TODO 要修改
-            ciss_set(CI_SS_MIC_VOICE_STATUE,CI_SS_MIC_VOICE_NORMAL);
-            asrtop_asr_system_continue();
-            prompt_player.mute_voice_in_flag = false;
-            #endif
-            #endif
-
-            #if USE_AEC_MODULE
-            // ciss_set(CI_SS_INTERCEPT_ASR_OUT, 1);
-            if (prompt_player.timer_handle == NULL)
-            {
-                prompt_player.timer_handle = xTimerCreate("intercept_timer", pdMS_TO_TICKS(600),pdFALSE, (void *)0, intercept_timer_callback);
-            }
-            xTimerStart(prompt_player.timer_handle, 0);
-            #endif
-        }
-    }
-    #endif
-    //xSemaphoreGive(muteMutex);
-}
-#endif
-
 static void combination_callback(int32_t play_cb_state)
 {
     voice_play_info_t voice_play_info;
@@ -315,15 +233,6 @@ static void combination_callback(int32_t play_cb_state)
         else
         {
             clean_play_queue();
-
-            // #if (PLAYER_CONTROL_PA)
-            // /*audio PA on*/
-            // //audio_play_hw_stop(ENABLE);
-            // //gpio_set_output_low_level(AUDIO_PLAY_CARD_DEFAULT_GPIO_BASE,AUDIO_PLAY_CARD_DEFAULT_GPIO_PIN);
-            // audio_play_hw_pa_da_ctl(DISABLE,true);
-            // #else
-            // audio_play_hw_pa_da_ctl(DISABLE,false);
-            // #endif
         }
     }
 #if SIMPLE_AUDIO_PLAYER_ENABLE   
@@ -721,12 +630,6 @@ uint32_t prompt_play_by_multi_cmd_id(prompt_play_info_t *p_play_info, int number
     }
     prompt_player.combination_index = 0;
 
-    /*audio PA on*/
-    // #if (PLAYER_CONTROL_PA)
-    // //audio_play_hw_start(ENABLE);
-    // audio_play_hw_pa_da_ctl(ENABLE,true);
-    // vTaskDelay(pdMS_TO_TICKS(100));
-    // #endif
     #if ONE_SHOT_ENABLE
     uint32_t rst = cmd_info_is_wakeup_word(voice_play_info.cmd_handle);
     pause_asr(!rst, !rst);
@@ -742,6 +645,7 @@ uint32_t prompt_play_by_multi_cmd_id(prompt_play_info_t *p_play_info, int number
     #else
     pause_asr(1, 1);
     #endif
+    
 	#if SIMPLE_AUDIO_PLAYER_ENABLE
 	sap_play(prompt_player.combination_list[prompt_player.combination_index++], combination_callback);
 	#else

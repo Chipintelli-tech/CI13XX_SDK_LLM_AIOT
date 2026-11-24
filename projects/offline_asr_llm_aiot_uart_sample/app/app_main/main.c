@@ -44,7 +44,6 @@
 #include "code_switch.h"
 #include "ci_nlp_user.h"
 #include "ci_nlp.h"
-#include "ota_config.h"
 #include "cias_network_msg_protocol.h"
 #include "timers.h"
 #include "ci_agc.h"
@@ -332,7 +331,6 @@ static void task_init(void *p_arg)
     #endif
     ciss_set(CI_SS_VOX_SET_END_CONFIDENCE, VOX_VAD_END_CONFIDENCE_DEFAULT);
     ciss_set(CI_SS_ALG_DEBUG_STATE, 0);           //开启前端算法调试
-	ciss_set(CI_SS_AEC_DEALY_HANDLE_FRAME, 60);   //AEC延迟处理帧数(60*16ms)，解决播放状态和喇叭播放声音不同步问题
     extern vox_config_t vox_config;
     uint8_t vox_thre_db = VOX_VAD_THRE_DB_DEFAULT;
     if(vox_thre_db >= 45 && vox_thre_db <= 48)
@@ -412,14 +410,18 @@ static void task_init(void *p_arg)
     decoder_task_init_port();
     #endif
     xTaskCreate(audio_in_manage_inner_task, "audio_in_manage_inner_task", 300, NULL, 4, NULL);
+   
+    /* 播放器任务 */
     #if SIMPLE_AUDIO_PLAYER_ENABLE
+    #if AUDIO_PLAYER_ENABLE || NET_AUDIO_PLAY_BY_MP3 || NET_AUDIO_PLAY_BY_PCM || NET_AUDIO_PLAY_BY_G722
     sap_init();
+    #endif
     #else
     #if AUDIO_PLAYER_ENABLE
-    /* 播放器任务 */
     audio_play_init();
     #endif
     #endif
+
     alg_model_init();     //初始化算法模型
     #if USE_AI_DOA
     xTaskCreate(doa_out_result_hand_task, "doa_out_result_hand_task", 256, NULL, 4, NULL);

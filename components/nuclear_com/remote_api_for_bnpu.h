@@ -11,7 +11,6 @@ extern void RC_BNPU_CALLER(audio_deal_one_frm_callback)(void* para);
 extern void RC_BNPU_CALLER(deal_one_frm_fft_rslt_callback)(void* para);
 extern void RC_BNPU_CALLER(print_doa_angle_in_host)(int audio_state, int num);
 extern void RC_BNPU_CALLER(print_pwk_db_in_host)(int db_val);
-extern void RC_BNPU_CALLER(print_bnpu_err_type_in_host)(int bnpu_err_type);
 extern void RC_BNPU_CALLER(sed_rslt_cb)(void* para);
 extern void RC_BNPU_CALLER(flash_get_en_data)(uint32_t scr_addr,uint8_t* data_in,uint32_t size);
 extern void RC_BNPU_CALLER(alg_aes_type_tip)(int type);

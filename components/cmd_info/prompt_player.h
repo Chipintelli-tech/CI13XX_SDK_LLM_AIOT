@@ -143,7 +143,7 @@ extern uint32_t prompt_play_by_multi_cmd_id(prompt_play_info_t *p_play_info, int
  * @return uint32_t 0:sucessful, nonzero: failed.
  */
 extern uint32_t prompt_stop_play();
-
+extern bool check_combination_index_state(void);
 #endif
 
 

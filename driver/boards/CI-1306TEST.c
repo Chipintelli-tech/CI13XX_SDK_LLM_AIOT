@@ -376,7 +376,7 @@ const cm_codec_hw_info_t host_mic_hw_info =
     .output_iis.tx_cha = IIS_TX_CHANNAL_TX0,
     .output_iis.scklrck_out_en = IIS_SCKLRCK_OUT,
     #endif
-#if AUDIO_DATA_PLAY_BY_UART
+#if AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_PLAY_BY_IIS
     .IICx = IIC_NULL,
     .output_iis.IISx = IIS1,
     .output_iis.iis_mode_sel = IIS_MASTER,
@@ -426,7 +426,11 @@ const cm_codec_hw_info_t host_mic_hw_info =
 #else
     .codec_gain.dig_gain_l = 6.0f,//数字增益配置，该值加/减 1 ,数字增益加/减 1dB
 #endif 
+    #if USE_AEC_MODULE
+    .codec_gain.dig_gain_r = 6.0f,
+    #else
     .codec_gain.dig_gain_r = 1.0f,
+    #endif
     .codec_if = 
     {
         .codec_init = icodec_init,
@@ -553,7 +557,12 @@ static cm_sound_info_t pre_rslt_out_sound_info =
     .channel_flag = 3,
     .sample_depth = IIS_DW_16BIT,
 };
-
+static cm_sound_info_t play_sound_info = 
+{
+    .sample_rate = 16000,
+    .channel_flag = 1,
+    .sample_depth = IIS_DW_16BIT,
+};
 
 /**
  * @brief 语音前处理使用CODEC的初始化
@@ -567,15 +576,7 @@ void audio_pre_rslt_out_codec_init(void)
 
     cm_pcm_buffer_info_t pcm_buffer_info;
     pcm_buffer_info.play_buffer_info.block_num = 1;
-    #if USE_DENOISE_NN || USE_AI_DOA
-    #if NET_AUDIO_PLAY_BY_OPUS||NET_AUDIO_PLAY_BY_PCM
-    pcm_buffer_info.play_buffer_info.buffer_num = AUDIO_IN_BUFFER_NUM + 6;
-    #else
-    pcm_buffer_info.play_buffer_info.buffer_num = AUDIO_IN_BUFFER_NUM + 6;
-    #endif
-    #else
-    pcm_buffer_info.play_buffer_info.buffer_num = 6;
-    #endif
+    pcm_buffer_info.play_buffer_info.buffer_num = 12;
     pcm_buffer_info.play_buffer_info.block_size = block_size;
     pcm_buffer_info.play_buffer_info.buffer_size = pcm_buffer_info.play_buffer_info.block_size * pcm_buffer_info.play_buffer_info.block_num;
     pcm_buffer_info.play_buffer_info.pcm_buffer = pvPortMalloc(pcm_buffer_info.play_buffer_info.buffer_size * pcm_buffer_info.play_buffer_info.buffer_num);
@@ -583,5 +584,5 @@ void audio_pre_rslt_out_codec_init(void)
     cm_config_pcm_buffer(PLAY_PRE_AUDIO_CODEC_ID, CODEC_OUTPUT, &pcm_buffer_info);
     //配置IIS放音音频格式
     
-    cm_config_codec(PLAY_PRE_AUDIO_CODEC_ID, CODEC_OUTPUT, &pre_rslt_out_sound_info);
+    cm_config_codec(PLAY_PRE_AUDIO_CODEC_ID, CODEC_OUTPUT, &play_sound_info);
 }

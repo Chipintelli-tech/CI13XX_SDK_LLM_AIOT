@@ -32,6 +32,7 @@ typedef struct
     uint32_t send_data_cnt;
 
     int32_t write_send_sub_slave; // 在slave模式下，write和send的差值
+    bool codec_start_flag[MAX_CODEC_NUM];        //codec启动标志，需缓存9帧否则会出现buffer无数据填0的情况
     // 是否使用硬件tx merge功能
     bool hardware_tx_merge;
 } audio_pre_init_tmp_t;
@@ -65,30 +66,46 @@ void audio_pre_rslt_out_play_card_init(void)
     sg_init_tmp_str.init_str.block_size = block_size;
     sg_init_tmp_str.write_data_cnt = 0;
     sg_init_tmp_str.send_data_cnt = 0;
-#if (USE_HP_OUT_NET_AUDIO || USE_HP_OUT_PRE_RSLT_AUDIO) && !SIMPLE_AUDIO_PLAYER_ENABLE
+    memset(sg_init_tmp_str.codec_start_flag,false,MAX_CODEC_NUM);
+
+#if AUDIO_DATA_PLAY_BY_IIS || ((USE_HP_OUT_NET_AUDIO || USE_HP_OUT_PRE_RSLT_AUDIO) && !SIMPLE_AUDIO_PLAYER_ENABLE)
     audio_pre_rslt_out_codec_init_pa_out();
 #endif
-#if USE_IIS1_OUT_PRE_RSLT_AUDIO || USE_HP_OUT_PRE_RSLT_AUDIO
-#if USE_AUDIO_UPLOAD_BY_IIS
+
+#if USE_IIS1_OUT_PRE_RSLT_AUDIO || AUDIO_DATA_UPLOAD_BY_IIS
     audio_pre_rslt_out_codec_init();
-    ref_in_codec_registe();
-    cm_start_codec(REF_RECORD_CODEC_ID, CODEC_INPUT);
-#else
-#if USE_IIS1_OUT_PRE_RSLT_AUDIO
-    audio_pre_rslt_out_codec_init();
-#endif
 #endif
 
-#endif
 }
-
-#if USE_DENOISE_NN_RTC
-static bool is_convert_left_right = false;
-void convert_left_and_right(bool r)
+void codec_output_ctl(int codec_index)
 {
-    is_convert_left_right = r;
+    if (MAX_CODEC_NUM <= codec_index)
+    {
+        mprintf("codec_index err\r\n");
+        return;
+    }
+    int cnt = cm_get_codec_busy_buffer_number(codec_index,CODEC_OUTPUT);
+    if (!sg_init_tmp_str.codec_start_flag[codec_index])
+    {
+        /*busy buffer 大于10帧再开启codec，否则会出现数据量不够的情况*/
+        if(cnt > 10)
+        {
+            mprintf("--%d codec start--\r\n",codec_index);
+            cm_start_codec(codec_index, CODEC_OUTPUT);
+            sg_init_tmp_str.codec_start_flag[codec_index] = true;
+        }
+    }
+    else
+    {
+        if(cnt == 0)
+        {
+            mprintf("--%d codec stop--\r\n",codec_index);
+            cm_stop_codec(codec_index, CODEC_OUTPUT);
+            sg_init_tmp_str.codec_start_flag[codec_index] = false;
+        }
+    }
 }
-#endif
+
 extern CiasAiotRunParamTypedef gCiasAiotRunParam;
 extern CiasAiotFuncParamTypedef gCiasAiotFuncParam;
 #if IIS_CHANNEL_ENG_CALC_EANBLE
@@ -160,40 +177,24 @@ void audio_pre_rslt_upload_by_iis(int16_t *left, int16_t *right, ci_wrapfft_audi
         }
         int16_t *pcm_data_p = (int16_t *)write_pcm_addr;
         for (int i = 0; i < num; i++)
-        {
-#if USE_DENOISE_NN_RTC
-            if (is_convert_left_right)
+        {     
+            if (gCiasAiotFuncParam.upload_audio_by_denoise) // 上传降噪音频
             {
-                pcm_data_p[2 * i] = right[i];
-                pcm_data_p[2 * i + 1] = left[i];
-            }
-            else
-#endif
-            {    
-                if (gCiasAiotFuncParam.upload_audio_by_denoise) // 上传降噪音频
+                if(ciss_get(CI_SS_AEC_WORK_STATE))  //AEC处理状态上传AEC处理后，降噪前的数据
                 {
-                    if(ciss_get(CI_SS_AEC_WORK_STATE))  //AEC处理状态上传AEC处理后，降噪前的数据
-                    {
-                        pcm_data_p[2 * i] = p_wrapfft_audio->asr_src_data[i];
-                        pcm_data_p[2 * i + 1] = p_wrapfft_audio->asr_src_data[i];
-                    }
-                    else
-                    {
-                        pcm_data_p[2 * i] = right[i];   
-                        pcm_data_p[2 * i + 1] = right[i];   //非AEC处理状态上传降噪后的音频
-                    }
+                    pcm_data_p[2 * i] = p_wrapfft_audio->asr_src_data[i];
+                    pcm_data_p[2 * i + 1] = p_wrapfft_audio->asr_src_data[i];
+                }
+                else
+                {
+                    pcm_data_p[2 * i] = right[i];   
+                    pcm_data_p[2 * i + 1] = right[i];   //非AEC处理状态上传降噪后的音频
                 }
             }
         }
         cm_write_codec(PLAY_PRE_AUDIO_CODEC_ID, (void *)write_pcm_addr, 0);
     }
-    if (0 == sg_init_tmp_str.send_data_cnt)
-    {
-        cm_start_codec(PLAY_PRE_AUDIO_CODEC_ID, CODEC_OUTPUT);
-// #if USE_HP_OUT_PRE_RSLT_AUDIO && !NET_AUDIO_PLAY_BY_PCM
-//         cm_start_codec(PLAY_CODEC_ID, CODEC_OUTPUT);
-// #endif
-    }
+    codec_output_ctl(PLAY_PRE_AUDIO_CODEC_ID);
     sg_init_tmp_str.send_data_cnt++;
     sg_init_tmp_str.write_data_cnt++;
 }
@@ -203,11 +204,10 @@ void audio_pre_rslt_upload_by_hpout(int16_t *left, int16_t *right, ci_wrapfft_au
     int ret = 0;
     uint32_t block_size = sg_init_tmp_str.init_str.block_size;
     int num = block_size / sizeof(int16_t) / 2;
-
-#if USE_IIS1_OUT_PRE_RSLT_AUDIO || USE_HP_OUT_PRE_RSLT_AUDIO
-    if ((gCiasAiotRunParam.is_wake_up_flag || gCiasAiotRunParam.is_always_hpout_flag))    
+#if HPOUT_UPLOAD_IS_WAKEUP
+    if ((gCiasAiotRunParam.is_wake_up_flag || gCiasAiotRunParam.is_always_hpout_flag)) 
+#endif   
     {
-    #if USE_HP_OUT_PRE_RSLT_AUDIO
         uint32_t write_pcm_addr_cpy = 0;
         cm_get_pcm_buffer(PLAY_CODEC_ID, &write_pcm_addr_cpy, 10); // TODO HSL
         if (0 == write_pcm_addr_cpy)
@@ -218,32 +218,30 @@ void audio_pre_rslt_upload_by_hpout(int16_t *left, int16_t *right, ci_wrapfft_au
         int16_t *pcm_data_p_cpy = (int16_t *)write_pcm_addr_cpy;
         for (int i = 0; i < num; i++)
         {
-    #if USE_DENOISE_NN_RTC
-            if (is_convert_left_right)
-            {
-                pcm_data_p_cpy[2 * i] = right[i];
-                pcm_data_p_cpy[2 * i + 1] = left[i];
-            }
-            else
-    #endif
-            {
-                pcm_data_p_cpy[2 * i] = right[i];
-                pcm_data_p_cpy[2 * i + 1] = right[i];
-            }
+            pcm_data_p_cpy[2 * i] = right[i];
+            pcm_data_p_cpy[2 * i + 1] = right[i];
         }
         cm_write_codec(PLAY_CODEC_ID, (void *)write_pcm_addr_cpy, 0);
-    #endif
     }
-#endif
-    if (0 == sg_init_tmp_str.send_data_cnt)
-    {
+    codec_output_ctl(PLAY_CODEC_ID);
+    
 #if USE_IIS1_OUT_PRE_RSLT_AUDIO
-        cm_start_codec(PLAY_PRE_AUDIO_CODEC_ID, CODEC_OUTPUT);
-#endif
-#if USE_HP_OUT_PRE_RSLT_AUDIO 
-        cm_start_codec(PLAY_CODEC_ID, CODEC_OUTPUT);
-#endif
+    uint32_t write_pcm_addr = 0;
+    cm_get_pcm_buffer(PLAY_PRE_AUDIO_CODEC_ID, &write_pcm_addr, 0); // TODO HSL
+    int16_t *pcm_data_p = (int16_t *)write_pcm_addr;
+    for (int i = 0; i < num; i++)
+    {
+        pcm_data_p[2 * i] = left[i];
+        pcm_data_p[2 * i + 1] = right[i];
     }
+    if (0 == write_pcm_addr)
+    {
+        return;
+    }
+    cm_write_codec(PLAY_PRE_AUDIO_CODEC_ID, (void *)write_pcm_addr, 0);
+    codec_output_ctl(PLAY_PRE_AUDIO_CODEC_ID);
+#endif
+
     sg_init_tmp_str.send_data_cnt++;
     sg_init_tmp_str.write_data_cnt++;
 }
@@ -328,18 +326,8 @@ void audio_pre_rslt_upload_by_uart(int16_t *left, int16_t *right, ci_wrapfft_aud
     int16_t *pcm_data_p = (int16_t *)write_pcm_addr;
     for (int i = 0; i < num; i++)
     {
-#if USE_DENOISE_NN_RTC
-        if (is_convert_left_right)
-        {
-            pcm_data_p[2 * i] = right[i];
-            pcm_data_p[2 * i + 1] = left[i];
-        }
-        else
-#endif
-        {
-            pcm_data_p[2 * i] = left[i];
-            pcm_data_p[2 * i + 1] = right[i];
-        }
+        pcm_data_p[2 * i] = left[i];
+        pcm_data_p[2 * i + 1] = right[i];
     }
     if (0 == write_pcm_addr)
     {
@@ -354,18 +342,8 @@ void audio_pre_rslt_upload_by_uart(int16_t *left, int16_t *right, ci_wrapfft_aud
     int16_t *pcm_data_p_cpy = (int16_t *)write_pcm_addr_cpy;
     for (int i = 0; i < num; i++)
     {
-#if USE_DENOISE_NN_RTC
-        if (is_convert_left_right)
-        {
-            pcm_data_p_cpy[2 * i] = right[i];
-            pcm_data_p_cpy[2 * i + 1] = left[i];
-        }
-        else
-#endif
-        {
-            pcm_data_p_cpy[2 * i] = left[i];
-            pcm_data_p_cpy[2 * i + 1] = right[i];
-        }
+        pcm_data_p_cpy[2 * i] = left[i];
+        pcm_data_p_cpy[2 * i + 1] = right[i];
     }
     if (0 == write_pcm_addr_cpy)
     {
@@ -373,16 +351,12 @@ void audio_pre_rslt_upload_by_uart(int16_t *left, int16_t *right, ci_wrapfft_aud
     }
     cm_write_codec(PLAY_CODEC_ID, (void *)write_pcm_addr_cpy, 0);
 #endif
-
-    if (0 == sg_init_tmp_str.send_data_cnt)
-    {
-#if USE_IIS1_OUT_PRE_RSLT_AUDIO
-        cm_start_codec(PLAY_PRE_AUDIO_CODEC_ID, CODEC_OUTPUT);
-#endif
-#if USE_HP_OUT_PRE_RSLT_AUDIO && !NET_AUDIO_PLAY_BY_PCM
-        cm_start_codec(PLAY_CODEC_ID, CODEC_OUTPUT);
-#endif
-    }
+    #if USE_IIS1_OUT_PRE_RSLT_AUDIO
+    codec_output_ctl(PLAY_PRE_AUDIO_CODEC_ID);
+    #endif
+    #if USE_HP_OUT_PRE_RSLT_AUDIO && !NET_AUDIO_PLAY_BY_PCM
+    codec_output_ctl(PLAY_CODEC_ID);
+    #endif
 #endif
     sg_init_tmp_str.send_data_cnt++;
     sg_init_tmp_str.write_data_cnt++;

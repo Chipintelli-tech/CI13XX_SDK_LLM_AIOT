@@ -183,7 +183,9 @@ bool cias_factory_test_init(void)
     {
         return false;
     }
+    #if USE_AUDIO_UPLOAD_BY_UART
     prompt_play_by_voice_id(FACTORY_TEST_AUDIO_ID, factory_test_play_done_callback, true);  //播放测试音频
+    #endif
     vTaskDelay(pdMS_TO_TICKS(50));
     if (!xTaskCreate(cias_audio_eng_check_task, "cias_audio_eng_check_task", 256, NULL, 4, NULL))
     {

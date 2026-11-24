@@ -939,10 +939,10 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
         ciss_set(CI_SS_CMD_SCORE,asr_msg->asr_score);
         if(cmd_info_is_wakeup_word(cmd_handle)) /*wakeup word*/
         {
+            mprintf("----voice_upload_enable---\n");
+            asr_wakeup_on_handle();
             #if AUDIO_DATA_UPLOAD_BY_UART
-                mprintf("----voice_upload_enable---\n");
-                asr_wakeup_on_handle();
-                weakup_asr_hander = cmd_handle;
+            weakup_asr_hander = cmd_handle;
             #endif
             /*updata wakeup state*/
             ciss_set(CI_SS_CMD_STATE,CI_SS_CMD_IS_WAKEUP);
@@ -988,15 +988,17 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
             uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
             uint16_t cmd_id = cmd_info_get_command_id(cmd_handle);
 #if !UPLOAD_PCM_DATA_ENABLE
-            gCiasAiotRunParam.is_vad_on_flag = false;
+
             uint8_t cmd_id_buf[2] = {0};
             cmd_id_buf[0]= (cmd_id & 0xff);
             cmd_id_buf[1] = ((cmd_id >> 8) & 0xff);
             cias_send_cmd_and_data(LOCAL_ASR_RESULT_NOTIFY, cmd_id_buf, 2, DEF_FILL);  // 发送本地识别通知  
+            #if LOCAL_REC_VAD_END_ENABLE
             //重置录音参数
             gCiasAiotRunParam.is_vad_on_flag = false;
             gCiasAiotRunParam.local_asr_finish_flag = true;
             cias_aiot_vad_end_handle(1);
+            #endif
 #endif
             ci_loginfo(LOG_USER,"asr cmd_id:%d,semantic_id:%08x\n", cmd_id, semantic_id);
             
@@ -1085,11 +1087,12 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
         ciss_set(CI_SS_CMD_SCORE,asr_msg->asr_score);
         if(cmd_info_is_wakeup_word(cmd_handle)) /*wakeup word*/
         {
+
+            mprintf("----voice_upload_enable---\n");
+            asr_wakeup_on_handle();
             #if AUDIO_DATA_UPLOAD_BY_UART
-                mprintf("----voice_upload_enable---\n");
-                asr_wakeup_on_handle();
-                weakup_asr_hander = cmd_handle;
-            #endif  
+            weakup_asr_hander = cmd_handle;
+            #endif
             #if USE_IR_ENABEL
             uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
             if (MAIN_ASR_ONESHORT_OPEN_AIR == semantic_id)
@@ -1136,15 +1139,16 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
             uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
             uint16_t cmd_id = cmd_info_get_command_id(cmd_handle);
 #if !UPLOAD_PCM_DATA_ENABLE
-            gCiasAiotRunParam.is_vad_on_flag = false;
             uint8_t cmd_id_buf[2] = {0};
             cmd_id_buf[0]= (cmd_id & 0xff);
             cmd_id_buf[1] = ((cmd_id >> 8) & 0xff);
             cias_send_cmd_and_data(LOCAL_ASR_RESULT_NOTIFY, cmd_id_buf, 2, DEF_FILL);  // 发送本地识别通知  
+            #if LOCAL_REC_VAD_END_ENABLE
             //重置录音参数
             gCiasAiotRunParam.is_vad_on_flag = false;
             gCiasAiotRunParam.local_asr_finish_flag = true;
             cias_aiot_vad_end_handle(1);
+            #endif
 #endif
             ci_loginfo(LOG_USER,"asr cmd_id:%d,semantic_id:%08x\n", cmd_id, semantic_id);
             #ifdef IR_DEVICE_ALL

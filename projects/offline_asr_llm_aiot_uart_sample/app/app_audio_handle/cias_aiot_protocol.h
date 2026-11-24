@@ -9,7 +9,6 @@
 typedef enum
 {
     CLOUD_PLAY_START,                       /*!< 云端播放开始 */
-    CLOUD_PLAY_START_DATA_WITING,           /*!< 云端播放开始数据等待 */
     CLOUD_DATA_PLAYING,                     /*!< 云端播放中 */
     CLOUD_PLAYING_DATA_WITING_TIMEOUT,      /*!< 云端播放中数据等待超时 */
     CLOUD_PLAY_END,                         /*!< 云端播放结束 */
@@ -67,6 +66,9 @@ typedef struct
     uint8_t cur_doa_aec_work_state;                   //当前doa和aec工作状态 1-doa 2-aec
     //按键功能
     bool key_is_busy_flag;                            //按键处理中
+    #if (PLAYER_CONTROL_PA)
+    bool pa_start_flag;
+    #endif
 }CiasAiotRunParamTypedef;
 
 //功能参数定义

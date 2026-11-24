@@ -18,9 +18,5 @@ typedef struct
 }ota_nv_status_t; 
 #pragma pack() 
 bool cias_online_func_init(void);
-#if AUDIO_DATA_PLAY_BY_UART
-bool audio_player_param_init(void);
-void request_play_data_func(void);
-#endif
-cinv_item_ret_t write_ota_mcu_status(bool status);
+cinv_item_ret_t write_ota_mcu_status(uint8_t status);
 #endif   //__CIAS_AUDIO_DATA_HANDLE_H__

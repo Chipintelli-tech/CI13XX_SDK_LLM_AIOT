@@ -76,22 +76,13 @@ void pad_config_for_uart(UART_TypeDef *UARTx)
  */
 void pad_config_for_iis(void)
 {
-    #if USE_AUDIO_UPLOAD_BY_IIS
+    #if AUDIO_DATA_PLAY_BY_IIS || AUDIO_DATA_UPLOAD_BY_IIS || USE_IIS1_OUT_PRE_RSLT_AUDIO
     IOResue_FUNCTION IISx_IO_reuse = SECOND_FUNCTION;
 	dpmu_set_io_reuse(PA2,IISx_IO_reuse);
     dpmu_set_io_reuse(PA3,IISx_IO_reuse);
     dpmu_set_io_reuse(PA4,IISx_IO_reuse);
     dpmu_set_io_reuse(PA5,IISx_IO_reuse);
     dpmu_set_io_reuse(PA6,IISx_IO_reuse);
-    #else
-    #if USE_IIS1_OUT_PRE_RSLT_AUDIO
-    IOResue_FUNCTION IISx_IO_reuse = SECOND_FUNCTION;
-	dpmu_set_io_reuse(PA2,IISx_IO_reuse);
-    dpmu_set_io_reuse(PA3,IISx_IO_reuse);
-    dpmu_set_io_reuse(PA4,IISx_IO_reuse);
-    dpmu_set_io_reuse(PA5,IISx_IO_reuse);
-    dpmu_set_io_reuse(PA6,IISx_IO_reuse);
-    #endif
     #endif
 }
 
@@ -388,7 +379,7 @@ const cm_codec_hw_info_t host_mic_hw_info =
     .output_iis.tx_cha = IIS_TX_CHANNAL_TX0,
     .output_iis.scklrck_out_en = IIS_SCKLRCK_MODENULL,//IIS_SCKLRCK_OUT,
     #endif
-#if AUDIO_DATA_PLAY_BY_UART
+#if AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_PLAY_BY_IIS
     .IICx = IIC_NULL,
     .output_iis.IISx = IIS1,
     .output_iis.iis_mode_sel = IIS_MASTER,
@@ -438,7 +429,11 @@ const cm_codec_hw_info_t host_mic_hw_info =
 #else
     .codec_gain.dig_gain_l = 6.0f,//数字增益配置，该值加/减 1 ,数字增益加/减 1dB
 #endif 
+    #if USE_AEC_MODULE
+    .codec_gain.dig_gain_r = 6.0f,
+    #else
     .codec_gain.dig_gain_r = 1.0f,
+    #endif
     .codec_if = 
     {
         .codec_init = icodec_init,
@@ -542,22 +537,22 @@ static const cm_codec_hw_info_t scan_freq_codec_info =
     .output_iis.iis_mode_sel = IIS_MASTER,//IIS_SLAVE,//IIS_MASTER,
     .output_iis.over_sample = IIS_MCLK_FS_256,
     .output_iis.clk_source = AUDIO_PLAY_CLK_SOURCE_IPCORE,//AUDIO_PLAY_CLK_SOURCE_INTER_RC,
-    .output_iis.mclk_out_en = IIS_MCLK_OUT,
+    .output_iis.mclk_out_en = IIS_MCLK_MODENULL,
     .output_iis.iis_data_format = IIS_DF_IIS,
     .output_iis.sck_lrck_ratio = IIS_SCK_LRCK_64,
     .output_iis.tx_cha = IIS_TX_CHANNAL_TX0,
-    .output_iis.scklrck_out_en = IIS_SCKLRCK_OUT,
+    .output_iis.scklrck_out_en = IIS_SCKLRCK_MODENULL,
 
     .input_iis.IISx = IIS1,
     .input_iis.iis_mode_sel = IIS_MASTER,
     .input_iis.over_sample = IIS_MCLK_FS_256,
     .input_iis.clk_source = AUDIO_PLAY_CLK_SOURCE_IPCORE,
-    .input_iis.mclk_out_en = IIS_MCLK_OUT,
+    .input_iis.mclk_out_en = IIS_MCLK_MODENULL,
     .input_iis.iis_data_format = IIS_DF_IIS,
     .input_iis.sck_lrck_ratio = IIS_SCK_LRCK_64,
     .input_iis.rx_cha = IIS_RX_CHANNAL_RX0,
     .input_iis.outside_mclk_fre = 0,
-    .input_iis.scklrck_out_en = IIS_SCKLRCK_OUT,//IIS_SCKLRCK_OUT,IIS_SCKLRCK_MODENULL
+    .input_iis.scklrck_out_en = IIS_SCKLRCK_MODENULL,//IIS_SCKLRCK_OUT,IIS_SCKLRCK_MODENULL
 #if 0
     .codec_gain.codec_adc_input_mode_l = INNER_CODEC_INPUT_MODE_DIFF,
     .codec_gain.codec_adc_input_mode_r = INNER_CODEC_INPUT_MODE_DIFF,
@@ -580,13 +575,6 @@ static const cm_codec_hw_info_t scan_freq_codec_info =
         .codec_ioctl = icodec_ioctl,
     }
 }; 
-
-static cm_sound_info_t pre_rslt_out_sound_info_my = 
-{
-    .sample_rate = 16000,
-    .channel_flag = 3,
-    .sample_depth = IIS_DW_16BIT,
-};
 
 
 const cm_codec_hw_info_t hw_inner_codec_info = 
@@ -633,9 +621,9 @@ cm_codec_hw_info_t audio_pre_tslt_out_info =
     .output_iis.sck_lrck_ratio = IIS_SCK_LRCK_64,
     .output_iis.tx_cha = IIS_TX_CHANNAL_TX0,
     .output_iis.scklrck_out_en = IIS_SCKLRCK_OUT,
-    #if USE_AUDIO_UPLOAD_BY_IIS
+    #if AUDIO_DATA_PLAY_BY_IIS
     .input_iis.IISx = IIS0,
-    .input_iis.iis_mode_sel = IIS_SLAVE,
+    .input_iis.iis_mode_sel = IIS_MASTER,
     .input_iis.over_sample = IIS_MCLK_FS_256,
     .input_iis.clk_source = AUDIO_PLAY_CLK_SOURCE_IPCORE,
     .input_iis.mclk_out_en = IIS_MCLK_OUT,
@@ -658,6 +646,12 @@ static cm_sound_info_t pre_rslt_out_sound_info =
     .channel_flag = 3,
     .sample_depth = IIS_DW_16BIT,
 };
+static cm_sound_info_t play_sound_info = 
+{
+    .sample_rate = 16000,
+    .channel_flag = 1,
+    .sample_depth = IIS_DW_16BIT,
+};
 
 
 /**
@@ -667,19 +661,13 @@ static cm_sound_info_t pre_rslt_out_sound_info =
 void audio_pre_rslt_out_codec_init(void)
 {
     uint16_t block_size = AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t);
+    #if !AUDIO_DATA_PLAY_BY_IIS
     cm_reg_codec(PLAY_PRE_AUDIO_CODEC_ID, (cm_codec_hw_info_t*)&audio_pre_tslt_out_info);
+    #endif
 
     cm_pcm_buffer_info_t pcm_buffer_info;
     pcm_buffer_info.play_buffer_info.block_num = 1;
-    #if USE_DENOISE_NN || USE_AI_DOA
-    #if NET_AUDIO_PLAY_BY_OPUS||NET_AUDIO_PLAY_BY_PCM
-    pcm_buffer_info.play_buffer_info.buffer_num = AUDIO_IN_BUFFER_NUM + 6;
-    #else
-    pcm_buffer_info.play_buffer_info.buffer_num = AUDIO_IN_BUFFER_NUM + 6;
-    #endif
-    #else
-    pcm_buffer_info.play_buffer_info.buffer_num = 6;
-    #endif
+    pcm_buffer_info.play_buffer_info.buffer_num = 12;
     pcm_buffer_info.play_buffer_info.block_size = block_size;
     pcm_buffer_info.play_buffer_info.buffer_size = pcm_buffer_info.play_buffer_info.block_size * pcm_buffer_info.play_buffer_info.block_num;
     pcm_buffer_info.play_buffer_info.pcm_buffer = pvPortMalloc(pcm_buffer_info.play_buffer_info.buffer_size * pcm_buffer_info.play_buffer_info.buffer_num);
@@ -718,7 +706,7 @@ void ref_in_codec_registe(void)
 #error "low power, don't use two mic!!!\n"
 #endif
     /*还应该加入codec power up的操作*/
-    // cm_reg_codec(REF_RECORD_CODEC_ID, (cm_codec_hw_info_t *)&audio_pre_tslt_out_info);
+    cm_reg_codec(REF_RECORD_CODEC_ID, (cm_codec_hw_info_t *)&audio_pre_tslt_out_info);
     uint32_t block_size = 0;
     uint8_t resample_block_double = 1;
 
@@ -754,23 +742,22 @@ void ref_in_codec_registe(void)
 void audio_pre_rslt_out_codec_init_pa_out(void)
 {
     static uint8_t *pa_out_codec_buf = NULL; 
-    uint16_t block_size = AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t);
+    #if AUDIO_DATA_PLAY_BY_IIS || AUDIO_DATA_UPLOAD_BY_HPOUT
+    uint16_t block_size = AUDIO_CAP_POINT_NUM_PER_FRM *2* sizeof(int16_t);
+    #else
+    uint16_t block_size = AUDIO_CAP_POINT_NUM_PER_FRM * sizeof(int16_t);
+    #endif
 
     // cm_reg_codec(PLAY_CODEC_ID, (cm_codec_hw_info_t*)&audio_pre_tslt_out_info);
 
     cm_pcm_buffer_info_t pcm_buffer_info;
     pcm_buffer_info.play_buffer_info.block_num = 1;
-    #if USE_DENOISE_NN || USE_AI_DOA   //前端计算太慢，需要加大play buffer
-    #if NET_AUDIO_PLAY_BY_OPUS||NET_AUDIO_PLAY_BY_PCM
-    pcm_buffer_info.play_buffer_info.buffer_num = AUDIO_IN_BUFFER_NUM + 6;
+    #if USE_AUDIO_UPLOAD_BY_HPOUT
+    pcm_buffer_info.play_buffer_info.buffer_num = 16;
     #else
-    pcm_buffer_info.play_buffer_info.buffer_num = AUDIO_IN_BUFFER_NUM + 6;
-    #endif
-    #else
-    pcm_buffer_info.play_buffer_info.buffer_num = 6;
+    pcm_buffer_info.play_buffer_info.buffer_num = 12;
     #endif
     pcm_buffer_info.play_buffer_info.block_size = block_size;
-
     pcm_buffer_info.play_buffer_info.buffer_size = pcm_buffer_info.play_buffer_info.block_size * pcm_buffer_info.play_buffer_info.block_num;
     if(!pa_out_codec_buf)
     {
@@ -785,5 +772,10 @@ void audio_pre_rslt_out_codec_init_pa_out(void)
     CI_ASSERT(pcm_buffer_info.play_buffer_info.pcm_buffer,"\n");
     cm_config_pcm_buffer(PLAY_CODEC_ID, CODEC_OUTPUT, &pcm_buffer_info);
     //配置IIS放音音频格式
+    #if AUDIO_DATA_PLAY_BY_IIS || AUDIO_DATA_UPLOAD_BY_HPOUT
     cm_config_codec(PLAY_CODEC_ID, CODEC_OUTPUT, &pre_rslt_out_sound_info);
+    #else
+    cm_config_codec(PLAY_CODEC_ID, CODEC_OUTPUT, &play_sound_info);
+    #endif
+
 }

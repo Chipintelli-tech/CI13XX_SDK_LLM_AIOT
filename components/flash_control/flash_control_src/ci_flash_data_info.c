@@ -31,7 +31,9 @@
 #include "copyright_verification.h"
 #include "flash_manage_outside_port.h"
 #include "status_share.h"
-#include "ota_config.h"
+
+#define FILECONFIG_SPIFLASH_BAK_ADDR 0x8000
+
 static __attribute__((section(".boot_parameter"))) partition_table_t partition_table_from_boot;
 static partition_table_t partition_table = {0};
 
@@ -183,7 +185,7 @@ uint16_t get_partition_list_checksum(partition_table_t *file_config)
 
     return sum;
 }
-#if 0
+
 //计算分区表信息的crc
 uint16_t get_partition_table_crc(partition_table_t *partition_table)
 {
@@ -215,7 +217,7 @@ uint16_t get_partition_table_crc(partition_table_t *partition_table)
     partition_table->user_file_status = user_file_status;
     return sum;
 }
-#endif
+
 // 校验分区表是否正确
 // true: 校验通过；false: 校验失败
 bool verify_partition_table(partition_table_t * partition_table_in)

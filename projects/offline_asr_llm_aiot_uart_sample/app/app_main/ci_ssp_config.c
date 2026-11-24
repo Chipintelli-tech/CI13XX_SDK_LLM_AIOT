@@ -189,13 +189,12 @@ const aec_config_t aec_config =
 	.ref_channel_num = 1,						       //参考信号通道数
 	.aec_control_mode = ENABLE_PLAYING_STATE_MODE,     //ENABLE_PLAYING_STATE_MODE:根据播报状态进行aec控制;  COMPUTE_REF_AMPL_MODE:根据参考幅值大小进行aec控制
 	.aec_gain = 1.0f,							       //增益数值
-	.aec_enable_threshold = 2000.0f,	               //参考信号判断门限值
-    .aec_mic_div_ref_thr = 0.0f,    
+	.aec_enable_threshold = 2000.0f,	               //参考信号判断门限值  
 	.nlp_flag = 2,
 	.aggr_mode = 1,
 	.fft_size = 256,	   //频域处理频点数
-	.alc_off_codec_adc_gain_mic = 20,   //可调
-    .alc_off_codec_adc_gain_ref = 0     //可调
+	.alc_off_codec_adc_gain_mic = 20,   //可调，单双麦都使用该增益
+    .alc_off_codec_adc_gain_ref = 0     //可调,仅使用内部codec作参考回路时使用，外部codec需在es7243e_init函数中设置alc_cfg_str.max_gain值
 };
 
 //vox模块配置
@@ -207,25 +206,8 @@ vox_config_t vox_config =
     .agc_gate_l = -6500.0f,
     .agc_gate_end = -3000.0f,
 
-    
-	//.vad_start_sen = VOX_VAD_SENSITIVITY,	        // 检测vad start的灵敏度
 	.vad_timeout_enable = VAD_TIMEOUT_CHECK,		// vad算法内部是否进行超时检测
 	.vad_on_max_timeout = VAD_FORCE_OVER_NUM_TIME,	// 强制结束录音的时间(单位S)
-    //高灵敏度
-	// .agc_split_boundary = 50.0f;
-    // .agc_gate_h = -3000.0f;
-	// .agc_gate_l = -4500.0f;
-    // .agc_gate_end = -2000.0f;
-	//中灵敏度
- 	// .agc_split_boundary = 53.0f;
-    // .agc_gate_h = -4000.0f;
-    // .agc_gate_l = -6500.0f;
-    // .agc_gate_end = -3000.0f;
-	//低灵敏度
-	// .agc_split_boundary = 58.0f,
-	// .agc_gate_h = -5500.0f;
-	// .agc_gate_l = -8000.0f,
-	// .agc_gate_end = -4500.0f,
 };
 
 //.module_config域配置为NULL表示关闭此项。

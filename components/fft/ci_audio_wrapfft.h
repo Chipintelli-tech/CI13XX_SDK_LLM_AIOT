@@ -76,6 +76,7 @@ typedef struct
 
     riscv_rfft_fast_instance_f32 S;
     ci_ahs_s* ahs_st;
+    float cur_aec_ref_eng;
 } ci_wrapfft_audio;
 
 #ifdef __cplusplus

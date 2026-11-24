@@ -63,6 +63,7 @@ typedef enum
     CM_IOCTRL_ALC_DISABLE,                      /*!< 关闭ALC，param1:ALC总开关(ENABLE=开,DISABLE=关);param2:ALC是否控制PGA(ENABLE=控制,DISABLE=不控制) */
     CM_IOCTRL_DAC_ENABLE,                       /*!< 使能DAC，param1:0=左声道,1=右声道; param2:ENABLE=开,DISABLE=关 */
     CM_IOCTRL_MUTE,                             /*!< 使能mute，param1:0=左声道,1=右声道; param2:ENABLE=开,DISABLE=关 */
+    CM_IOCTRL_ALC_STATE_GET,                    /*!< 获取ALC状态，param1:0=左声道,1=右声道 */
 }cm_io_ctrl_cmd_t;
 
 
@@ -202,6 +203,8 @@ extern int cm_set_codec_dac_gain(int codec_index, cm_cha_sel_t cha, int gain);
 extern int cm_set_codec_adc_gain(int codec_index, cm_cha_sel_t cha, int gain);
 
 extern int cm_set_codec_alc(int codec_index, cm_cha_sel_t cha, FunctionalState alc_enable);
+
+extern int cm_get_codec_alc_state(int codec_index, cm_cha_sel_t cha);
 
 extern int cm_set_codec_dac_enable(int codec_index, int channel, FunctionalState en);
 

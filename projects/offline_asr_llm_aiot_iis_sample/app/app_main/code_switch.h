@@ -10,8 +10,6 @@
 #include "ci130x_spiflash.h"
 #include "ci130x_gpio.h"
 #include "ci130x_dma.h"
-#include "audio_play_api.h"
-#include "audio_play_decoder.h"
 #include "ci_flash_data_info.h"
 // #include "ci130x_audio_capture.h"
 #include "board.h"
@@ -37,7 +35,10 @@
 #include "ota_partition_verify.h"
 #include "doa_app_handle.h"
 #include "codec_manage_outside_port.h"
-
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
+#include "audio_play_api.h"
+#include "audio_play_decoder.h"
+#endif
 #define DNN_CODE2_ADDR_ID 60099 
 uint32_t get_code2_addr(int index);
 void uart_data_handle_task(void);

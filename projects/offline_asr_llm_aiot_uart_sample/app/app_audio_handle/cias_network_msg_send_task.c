@@ -15,6 +15,7 @@
 #include "cias_audio_data_handle.h"
 #include "cias_common.h"
 #include "user_config.h"
+#if WIFI_CMD_BY_UART || AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_UPLOAD_BY_UART
 
 uint8_t broad_link_buf[NETWORK_SEND_BUFF_NUM * NETWORK_SEND_BUFF_MAX_SIZE] = {0}; // 
 static QueueHandle_t network_msg_queue = NULL;
@@ -298,4 +299,21 @@ void network_send_data_task(void *p_arg)
         vTaskDelay(pdMS_TO_TICKS(5));    //发送加延时，防止接收端串口buffer溢出
     }
 }
-
+#else
+int32_t cias_send_cmd(uint32_t cmd, uint32_t fill_data)
+{
+    return 0;
+}
+int32_t cias_send_cmd_and_data(uint32_t cmd_type, uint8_t *buf, int32_t len, uint32_t fill_data)
+{
+    return 0;
+}
+int voice_data_packet_and_send(uint32_t packet_type,uint8_t *voice_data, int32_t packet_len)
+{
+    return 0;
+}
+int cias_cjson_packet_and_send(uint32_t packet_type,uint8_t *data, int32_t packet_len)
+{
+    return 0;
+}
+#endif

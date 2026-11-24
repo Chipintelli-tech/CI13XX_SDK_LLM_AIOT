@@ -6,7 +6,7 @@
 #include "codec_manager.h"
 #include "ci130x_system.h"
 #include "ci130x_audio_pre_rslt_out.h"
-
+#include "status_share.h"
 #define CHECK_PARA_NUM  (0)
 
 #define CMI_CI_ASSERT(x,msg)                                                                                                    \
@@ -80,6 +80,16 @@ int32_t codec_manage_inner_serve_cb(void *payload, uint32_t payload_len, uint32_
             cm_cha_sel_t cha = (cm_cha_sel_t)data[2];
             FunctionalState alc_enable = (FunctionalState)data[3];
             cm_set_codec_alc(codec_index,cha,alc_enable);
+            break;
+        }
+        case cm_get_codec_alc_state_ept_num:
+        {
+             int codec_index = (int)data[1];
+            if((bool)cm_get_codec_alc_state(codec_index, CM_CHA_LEFT)
+            || (bool)cm_get_codec_alc_state(codec_index, CM_CHA_RIGHT))
+                ciss_set(CI_SS_AEC_ALC_STATE,CI_SS_AEC_ALC_OPENED_TO_CLOSE);
+            else
+                ciss_set(CI_SS_AEC_ALC_STATE,CI_SS_AEC_ALC_CLOSED);
             break;
         }
         case cinn_malloc_in_host_sram_ept_num:

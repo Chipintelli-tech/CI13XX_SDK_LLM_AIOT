@@ -158,7 +158,8 @@ typedef enum{
     NET_CONFIG_SUCCESS                  =  0x040b,   //配网成功
     NET_CONFIG_FAIL                     =  0x040c,   //配网失败
     
-    //and by yjd 
+    //and by yjd
+    CIAS_GET_SOFT_VER                   =  0x0500,      //获取软件版本号
     CIAS_OTA_START                      =  0x0501,      //开始ota
     CIAS_OTA_DATA                       =  0x0502,      //ota 数据
     CIAS_OTA_SUCESS                     =  0x0503,      // OTA升级成功
@@ -185,15 +186,19 @@ typedef enum{
     CIAS_AUDIO_SYS_ERR                  = 0x0602,       //语音系统异常 
     CIAS_AUDIO_RST                      = 0x0603,        //复位语音芯片
 	//自学习相关
-    CWSL_UART_REGISTRATION_WAKE         = 0x0701,         /*串口进入学习唤醒词*/
-    CWSL_UART_REGISTRATION_WAKE_ING     = 0x0702,         /*正在学习唤醒词状态中*/
-    CWSL_UART_REGISTRATION_WAKE_END_SUCCESSFUL = 0x0703,  /*学习唤醒词成功*/
-    CWSL_UART_REGISTRATION_WAKE_END_FAILED = 0x0704,      /*学习唤醒词失败*/
-    CWSL_UART_EXIT_REGISTRATION            = 0x0705,      /*退出学习*/
-    CWSL_UART_DELETE_WAKE                  = 0x0706,      /*删除唤醒词*/
+    CWSL_UART_REGISTRATION_WAKE             = 0x0701,     /*串口进入学习唤醒词*/
+    CWSL_UART_REGISTRATION_WAKE_ING         = 0x0702,     /*正在学习唤醒词状态中*/
+    CWSL_UART_REGISTRATION_CMD              = 0x0703,     /*串口进入学习命令词*/
+    CWSL_UART_REGISTRATION_CMD_ING          = 0x0704,     /*正在学习命令词状态中*/
+    CWSL_UART_REGISTRATION_END_SUCCESSFUL   = 0x0705,     /*学习成功*/
+    CWSL_UART_REGISTRATION_END_FAILED       = 0x0706,     /*学习失败*/
+    CWSL_UART_EXIT_REGISTRATION             = 0x0707,     /*退出学习*/
+    CWSL_UART_DELETE_WAKE                   = 0x0708,     /*删除唤醒词*/
+    CWSL_UART_DELETE_CMD                    = 0x0709,     /*删除命令词*/
     //指令执行状态相关
     CIAS_CMD_EXEC_STATE                    =  0x0801,     /*指令执行状态，返回数据部分3字节 前两字节表示语音芯片接收到指令的类型， 第3字节表示指令执行结果(0x01-执行成功 0x02-执行失败)*/
-
+    //DOA相关
+    DOA_ANGLE                              =  0x0901,   /*doa角度输出*/  
    //===注意用户使用地址请从0x4xxx开始，避免和系统指令冲突
 }wifi_communicate_cmd_t;
 

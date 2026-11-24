@@ -26,11 +26,7 @@ float load_freq_correct_factor()
     float ret = 1.0;
     uint8_t buffer[12];
     const spic_security_reg_t regs[3] = {SPIC_SECURITY_REG1, SPIC_SECURITY_REG2, SPIC_SECURITY_REG3};
-#if CI_OTA_ENABLE   //for ota
-    flash_init(QSPI0, DISABLE);
-#else
     flash_init(QSPI0, ENABLE);
-#endif
     for (int i = 0;i < 2;i++)
     {
         spic_read_security_reg(QSPI0, regs[i], buffer, 0, 12);

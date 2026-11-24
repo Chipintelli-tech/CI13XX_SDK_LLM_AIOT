@@ -58,12 +58,6 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 //**通讯串口配置
 #define CONFIG_CI_LOG_UART             HAL_UART0_BASE  //配置log输出使用的串口，请勿与protocol共用同一个串口
 
-#define MSG_COM_USE_UART_EN            0   //0,关闭语音模块通讯协议。1,开启语音模块通讯协议。
-#define UART_PROTOCOL_NUMBER           (HAL_UART2_BASE)    //语音模块协议使用的串口，请勿与log共用同一个串口。
-#define UART_PROTOCOL_BAUDRATE         (UART_BaudRate921600) //语音模块协议使用的串口波特率。
-#define UART_PROTOCOL_VER              2   //语音模块协议版本号:1,一代协议。2,二代协议，255,平台生成协议
-
-
 #define CLOUD_UART_PROTOCOL_EN         0   //云端协议使能-只有在启英开发者平台做固件配协议能用
 #if CLOUD_UART_PROTOCOL_EN
 #define CLOUD_CFG_UART_SEND_EN         1   //使能串口发送数据
@@ -78,17 +72,8 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #define UART1_PAD_OPENDRAIN_MODE_EN     0   //0,UART1为推挽模式。1,UART1为开漏模式。
 #define UART2_PAD_OPENDRAIN_MODE_EN     0   //0,UART2为推挽模式。1,UART2为开漏模式。
 
-//**OTA配置 当前版本不支持
-#define OTA_TIMOUT                  3 //数据超时时间，单位秒
-#define OTA_RETRY_TIME              10//数据重复发送次数
-#if (USE_CI_D06GT01D_BOARD == 1)
-#define OTA_CHIP_TYPE_1306          1
-#elif (USE_CI_D06GT01J_BOARD == 1)
-#define OTA_CHIP_TYPE_1306          1
-#else
-#define OTA_CHIP_TYPE_1306          0
-#endif  
-
+// ota使能
+#define CI_OTA_ENABLE                   0   // 1使能 0 不使能
 
 //**时钟源配置
 #ifndef USE_EXTERNAL_CRYSTAL_OSC
@@ -126,29 +111,68 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #define AUDIO_DATA_PLAY_BY_UART                         (1)            //通过串口接收音频数据播放配置
 #endif
 
+#if !AUDIO_DATA_UPLOAD_BY_UART && !AUDIO_DATA_PLAY_BY_UART
+#define WIFI_CMD_BY_UART                                (1)            //通过串口和wifi指令交互配置
+#endif
+
+#ifndef CIAS_AIOT_DEMO_ENABLE
+#define CIAS_AIOT_DEMO_ENABLE                           (1)            
+#endif
+
 #define  AUDIO_VAD_CHECK_ENABLE                           1            //vad 检测功能使能-不可修改
 
 // 若使用的组合内存不够，可关闭重采样，节省24KB内存，但是识别效果会下降5个点左右
 //压缩算法选择-pcm和speex和opus只能三选一,不能同时支持; opus压缩+mp3播放不支持自学习，推荐推荐设置SYS_HEAP_SIZE = (1024*110))
+#if (AUDIO_DATA_UPLOAD_BY_UART)
 #define AUDIO_COMPRESS_RECORD_DISABLE                     0            //(务必在makefile中配置宏AIOT_AUDIO_COMPRESS_TYPE=0)PCM上传数据，不做数据压缩 推荐设置SYS_HEAP_SIZE = (1024*130))
 #define AUDIO_COMPRESS_SPEEX_ENABLE                       1            //(务必在makefile中配置宏AIOT_AUDIO_COMPRESS_TYPE=1) 1-处理使能SPEEX压缩后的数据 2-使能opus压缩；推荐设置SYS_HEAP_SIZE = (1024*110)) 
 #define AUDIO_COMPRESS_OPUS_ENABLE                        0            //(务必在makefile中配置宏AIOT_AUDIO_COMPRESS_TYPE=2) 1-处理使能SPEEX压缩后的数据 2-使能opus压缩 OPUS比speex多消耗31KB内存,目前仅USE_AEC_DENOISE_NN算法支持，其余内存不够
 #define AUDIO_COMPRESS_G722_ENABLE                        0            //(务必在makefile中配置宏AIOT_AUDIO_COMPRESS_TYPE=0)20ms压缩一次，320个点，640字节压缩为160字节，压缩率为4:1 推荐设置SYS_HEAP_SIZE = (1024*130)) 
+#endif
 //网络数据播放类型选择-mp3和pcm和opus只能三选一，不能同时支持;
+#if (AUDIO_DATA_PLAY_BY_UART)
 #define NET_AUDIO_PLAY_BY_MP3                             1            //云端播放通过mp3格式(注意:推荐设置SYS_HEAP_SIZE = (1024*110))  
 #define NET_AUDIO_PLAY_BY_PCM                             0            //云端播放通过pcm格式(注意:推荐设置SYS_HEAP_SIZE = (1024*130))
 #define NET_AUDIO_PLAY_BY_G722                            0            //云端播放通过G722格式播放,必须使用精简播放器 推荐设置SYS_HEAP_SIZE = (1024*130)) 
-
+#endif
 //语音数据上传是否带协议头
 #define AUDIO_SEND_WITH_PROTOCOL_HEADER                   1            //1-带协议头上传(默认) 0-不带协议直接传裸数据-调试使用
+
+//云端交互相关配置          
+#define CUR_INTERACTION_MULTI_ROUND_ENABLE                1              //1-多轮 0-单轮
+#define UPLOAD_PLAY_FULL_DUPLEX_ENABLE                    1              //全双工处理,播放音频的同时支持vad检测音频上传
+#define VAD_START_STOP_PLAY_ENABLE                        0              //全双工模式下，vad起来，立刻停止播放 1-停止播放 0-不停止播放
+#define CLOUD_ANS_TIME_OUT_ENEABLE                        1              //云端响应超时功能使能
+#define CLOUD_ANS_TIME_OUT_VALUE                          6              //云端响应超时时间6S，必须大于0
+#define AUDIO_PLAY_MODE                                   1              //1-支持打断当前播放 0-不支持，顺序播放-暂时不用
+#define UPLOAD_NNDENOISE_AUDIO_DATA_ENABLE                1              //1-上传降噪的音频 0-上传非降噪的音频
+#define CHECK_NET_WORK_STATE_ENABLE                       0              //检测网络状态后再上传音频宏
+#define PCM_MSG_STREAM_NUM                               30              //原始数据stream buf大小   //30
+#define LOCAL_REC_VAD_END_ENABLE                          1              //本地识别后立即停止VAD,若不停止，在半双工并且本地词条有播报情况下,播报时会丢录音
+//回退帧数配置
+#define PCM_ALG_ROOLBACK_FRAME_LEN                        25             //前端回退25帧400ms-
+#define PCM_ALG_FRAME_LEN                                 512            //前端原始音频16K采样，每帧256个点共512字节
+
+//最小音频帧过滤
+#define VAD_ON_MIN_NUM    (25)                                           //vad起来判断有效最短帧数为25帧(10ms一帧),最大40
+#if VAD_ON_MIN_NUM > 40
+#error "The VAD_ON_MIN_NUM max 40\n"
+#endif
 //VAD算法内部是否进行超时检测
 #define VAD_TIMEOUT_CHECK                                 1            //0-不进行超时检测 1-进行超时检测-不可修改
 //强制结束录音时间
 #define VAD_FORCE_OVER_NUM_TIME                           5            //强制结束录音的时间(单位S)，上传音频 
 
+//和WiFi通信串口及参数配置
+#if AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_UPLOAD_BY_UART || WIFI_CMD_BY_UART
+#define UART_NUM_SEND_PLAY_AUDIO_NUMBER                  HAL_UART1_BASE           //网络端交互的串口
+#define UART_NUM_SEND_PLAY_AUDIO_BAUDRATE                UART_BaudRate921600      //网络端交互的串口波特率
+#endif
 
 #if NET_AUDIO_PLAY_BY_PCM || NET_AUDIO_PLAY_BY_OPUS || NET_AUDIO_PLAY_BY_G722
+#if SIMPLE_AUDIO_PLAYER_ENABLE
 #define NET_PLAY_PCM_OR_G722_ENABLE_LOCAL_PLAY            1             //云端播放通过pcm、G722格式时,同时开启本地播报
+#endif
 #define USE_HP_OUT_NET_AUDIO                              1             //使用hpout直接输出云端音频
 #define PLAY_PCM_FRAME_ENABLE                             1             //播放pcm数据
 #define PLAY_PCM_FRAME_BUF_LEN                         1024*6           //pcm播放缓冲大小
@@ -173,7 +197,7 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #if NET_AUDIO_PLAY_BY_PCM
 #define REQUEST_ONE_FRAME_SEZIE                          1024*4          //pcm单帧请求播放数据大小最小为4K，不然会出现播放卡顿
 #elif   NET_AUDIO_PLAY_BY_MP3  
-#define REQUEST_ONE_FRAME_SEZIE                          1024*1          //请求单帧播放数据大小(mp3)
+#define REQUEST_ONE_FRAME_SEZIE                          1024*1          //请求单帧播放数据大小(mp3)，比特率大于128kbps，建议使用2k
 #elif   NET_AUDIO_PLAY_BY_OPUS  
 #define REQUEST_ONE_FRAME_SEZIE                          320             //请求单帧播放数据大小(opus) 4帧*1280
 #elif   NET_AUDIO_PLAY_BY_G722  
@@ -208,32 +232,10 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #define PCM_UPLOAD_QUEUE_NUM                              60             //上传数据队列大小   //60
 #define COMPRESS_NEED_PCM_LEN                            320             //不可修改(320个点 short)
 #define COMPRESS_UPLOAD_QUEUE_TIEM_SIZE                  160             //上传队列元素大小,speex编码后每帧长度42字节
-#endif
-//回退帧数配置
-#define PCM_ALG_ROOLBACK_FRAME_LEN                        25             //前端回退25帧400ms-
-#define PCM_ALG_FRAME_LEN                                 512            //前端原始音频16K采样，每帧256个点共512字节
-//          
-#define CUR_INTERACTION_MULTI_ROUND_ENABLE                1              //1-多轮 0-单轮
-#define UPLOAD_PLAY_FULL_DUPLEX_ENABLE                    0              //全双工处理,播放音频的同时支持vad检测音频上传
-#define VAD_START_STOP_PLAY_ENABLE                        0              //全双工模式下，vad起来，立刻停止播放 1-停止播放 0-不停止播放
-#define CLOUD_ANS_TIME_OUT_ENEABLE                        1              //云端响应超时功能使能
-#define CLOUD_ANS_TIME_OUT_VALUE                          6              //云端响应超时时间6S，必须大于0
-#define AUDIO_PLAY_MODE                                   1              //1-支持打断当前播放 0-不支持，顺序播放-暂时不用
-#define UPLOAD_NNDENOISE_AUDIO_DATA_ENABLE                1              //1-上传降噪的音频 0-上传非降噪的音频
-#define CHECK_NET_WORK_STATE_ENABLE                       0              //检测网络状态后再上传音频宏
-#define PCM_MSG_STREAM_NUM                               30              //原始数据stream buf大小   //30
-
-//最小音频帧过滤
-#define VAD_ON_MIN_NUM    (25)                                           //vad起来判断有效最短帧数为25帧(10ms一帧),最大40
-#if VAD_ON_MIN_NUM > 40
-#error "The VAD_ON_MIN_NUM max 40\n"
+#else
+#define COMPRESS_UPLOAD_QUEUE_TIEM_SIZE                  128             //上传队列元素大小,speex编码后每帧长度42字节
 #endif
 
-//和WiFi通信串口及参数配置
-#if AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_UPLOAD_BY_UART
-#define UART_NUM_SEND_PLAY_AUDIO_NUMBER                  HAL_UART1_BASE           //网络端交互的串口
-#define UART_NUM_SEND_PLAY_AUDIO_BAUDRATE                UART_BaudRate921600      //网络端交互的串口波特率
-#endif
 #if NET_AUDIO_PLAY_BY_MP3 && AUDIO_COMPRESS_RECORD_DISABLE && UPLOAD_PLAY_FULL_DUPLEX_ENABLE && !VAD_START_STOP_PLAY_ENABLE
 #define NETWORK_RECV_BUFF_MAX_SIZE                       (REQUEST_ONE_FRAME_SEZIE*10 + 20) //接收网络端串口数据最大size-帧头+预留4字节
 #define AIOT_AUDIO_PLAY_BUF_SIZE                         (12 * 1024)       //播放器缓存大小
@@ -252,15 +254,6 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #else
 #define NETWORK_SEND_BUFF_NUM                             5            //发送串口数据到网络端缓冲区个数  
 #endif
-
-//生产测试使用
-#define IIS_CHANNEL_ENG_CALC_EANBLE                       0              //iis通道能量计算
-#define ENG_CALC_INTERVAL_FRAME                           10             //iis通道能量10帧计算一次(可根据需求修改)
-#define CIAS_HAVE_AUDIO_ENG_MICL                          50             //左MIC有音频能量阈值设置，默认50db    
-#define CIAS_HAVE_AUDIO_ENG_MICR                          50             //右MIC有音频能量阈值设置，默认50db    
-#define CIAS_HAVE_AUDIO_ENG_REFL                          50             //REFL有音频能量阈值设置，默认50db    
-#define CIAS_HAVE_AUDIO_ENG_REFR                          50             //REFR有音频能量阈值设置，默认50db    
-#define CIAS_UPLOD_FACTORY_TEST_REAL_VAL                  0              //上传音频上传过程中的实时值 0-不上传 1-上传  
 
 #define CI230X_AUDIO_DATA_OUT_BY_UART                     0             //230X芯片调试使用，上传音频同时通过另外一个串口将音频数据发出
 #define UPLOAD_PCM_DATA_ENABLE                            0             //上传音频裸数据不带协议-调试使用 1-使能 0-关闭(默认)
@@ -317,6 +310,9 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #define VOLUME_DEFAULT                  5   //设置音量调节的默认值。
 
 #if AUDIO_PLAYER_ENABLE
+#if SIMPLE_AUDIO_PLAYER_ENABLE && NET_AUDIO_PLAY_BY_MP3
+#define MP3_NO_CONSTANT_BITRATE         0   //开启非恒定比特率的模式VBR、ABR适配
+#else
 #if NET_AUDIO_PLAY_BY_OPUS
 #define USE_OPUS_DECODER                1   //为1时加入opus解码器，1:是 0:否。
 #else
@@ -325,7 +321,13 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #define USE_PROMPT_DECODER              1   //播放器是否支持prompt解码器，1:是 0:否。
 #endif
 #endif
+#endif
 
+//离在线主要使用与WIFI通信的串口，根据需求增加该串口
+#define MSG_COM_USE_UART_EN            0   //0,关闭语音模块通讯协议。1,开启语音模块通讯协议。
+#define UART_PROTOCOL_NUMBER           (HAL_UART2_BASE)    //语音模块协议使用的串口，请勿与log共用同一个串口。
+#define UART_PROTOCOL_BAUDRATE         (UART_BaudRate921600) //语音模块协议使用的串口波特率。
+#define UART_PROTOCOL_VER              2   //语音模块协议版本号:1,一代协议。2,二代协议，255,平台生成协议
 
 #define BF_DEEPSE_MODE                  1   //1:全深度分离更耗内存(单双网络都可以用) 0：半深度分离(唤醒词做深度分离，命令词不做，只能用双网络)
 #define BF_ASR_VALID_MODE               0   //1:开启ASR打分是否有效判断功能 0：关闭ASR打分是否有效判断功能 该功能只针对全深度分离和半深度分离
@@ -527,9 +529,9 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #if USE_IR_ENABEL && (UART_PROTOCOL_VER != 2)
 #error "use ir function, UART_PROTOCOL_VER must set 2!\n"
 #endif
-#if NET_AUDIO_PLAY_BY_PCM || NET_AUDIO_PLAY_BY_OPUS || NET_AUDIO_PLAY_BY_G722
+#if NET_AUDIO_PLAY_BY_OPUS || NET_AUDIO_PLAY_BY_G722
 #if !SIMPLE_AUDIO_PLAYER_ENABLE
-#error  "play pcm or opus or G722 audio data, must set makefile USE_AUDIO_PLAYER_TYPE = 0"
+#error  "play opus or G722 audio data, must set makefile USE_AUDIO_PLAYER_TYPE = 0"
 #endif
 #endif
 #if AUDIO_COMPRESS_SPEEX_ENABLE && AUDIO_COMPRESS_OPUS_ENABLE

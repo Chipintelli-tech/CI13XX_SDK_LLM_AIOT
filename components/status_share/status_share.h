@@ -56,7 +56,7 @@ typedef enum
     CI_SS_INTERCEPT_ASR_OUT,        //是否拦截ASR输出：0、不拦截；1、拦截
 
     CI_SS_PLAY_TYPE,                //目前正在播放的类型
-
+    CI_SS_AEC_ALC_STATE,
     CI_SS_ALC_AUTO_SWITCH_IS_OPEN,
     CI_SS_AEC_IS_OPEN,
     CI_SS_AEC_DEALY_HANDLE_FRAME,   //aec延迟处理的帧数
@@ -81,6 +81,8 @@ typedef enum
     CI_SS_TTS_DUR_MODEL_ADDR,
     CI_SS_GET_DOA_ANGLE,
     /*系统参数设置*/
+    CI_SS_AUDIO_DEAL_ERR_CNT,           //音频处理丢帧计数  
+    CI_SS_NN_OUT_ERR_CNT, 
     //decoder参数设置
     CI_SS_DECODER_MIN_ACTIVE,      //默认400，若节点小于8000，可尝试修改到300，不可随意更改
     CI_SS_DECODER_BEAM,            //默认9.5
@@ -96,7 +98,6 @@ typedef enum
     CI_SS_WAKE_UP_START_INDEX_FOR_PWK,
     CI_SS_WAKE_UP_VALID_FRAME_LEN_FOR_PWK,
     CI_SS_ANY_MIC_AEC_PCM_THR_VAL,
-    CI_SS_NN_OUT_ERR_CNT,
     //下面的值用于统计状态ID数量，本模块内部使用，请不要修改。
     EM_STATUS_NUM,
 } status_id_t;
@@ -172,6 +173,17 @@ typedef enum
     CI_SS_PLAY_TYPE_CMD_PROMPT,
 }ci_ss_play_type_t;
 
+/**
+ * @brief AEC ALC状态
+ *
+ */
+typedef enum
+{
+	CI_SS_AEC_ALC_IDLE = 0,                 /*!< 空闲  */
+	CI_SS_AEC_ALC_CLOSED,                   /*!< AEC开始时ALC关闭状态，不需要去关闭ALC   */
+	CI_SS_AEC_ALC_OPENED_TO_CLOSE,          /*!< AEC开始时ALC开启状态，需要去关闭ALC   */
+	CI_SS_AEC_ALC_CLOSED_TO_OPEN,           /*!< AEC开始时ALC开启状态，处理时已经关闭，结束时需要去开启ALC   */
+}ci_ss_aec_alc_state;
 typedef enum
 {
     CI_SS_CWSL_AEC_MUTE_OFF = 0,

@@ -30,12 +30,17 @@ void pdf_cloud_pre_init(uint32_t buffer_size)
     //云端播放需要先初始化共用流缓存，在播放器中初始化可能会遇到wifi端下发MP3头后，流缓存初始化导致数据丢失
     pdf_deinit();
     if(data_fetch_task_info.data_buffer == NULL)
-    data_fetch_task_info.data_buffer = xStreamBufferCreate(buffer_size, 1);
+    {
+        data_fetch_task_info.data_buffer = xStreamBufferCreate(buffer_size, 1);
+        if(!data_fetch_task_info.data_buffer)
+        {
+            ci_logerr(CI_LOG_ERROR, "not enough memory\n");
+        }    
+    }
 }
 
-void pdf_init(src_data_info_t *src_data_info)
+int pdf_init(src_data_info_t *src_data_info)
 {
-    // if(gCiasAiotRunParam.cloud_play_state != CLOUD_PLAY_START)
     pdf_deinit();
 
     // 将传入的参数赋值给data_fetch_task_info结构体
@@ -46,16 +51,21 @@ void pdf_init(src_data_info_t *src_data_info)
         data_fetch_task_info.src_data_info.data_size = PDF_MAX_DATA_SIZE;
     }
     // 创建一个流缓冲区，用于存储数据
-    // if(gCiasAiotRunParam.cloud_play_state != CLOUD_PLAY_START)
     if(data_fetch_task_info.data_buffer == NULL)
-    data_fetch_task_info.data_buffer = xStreamBufferCreate(src_data_info->buffer_size, 1);
+    {
+        data_fetch_task_info.data_buffer = xStreamBufferCreate(src_data_info->buffer_size, 1);
+        if(!data_fetch_task_info.data_buffer)
+        {
+            ci_logerr(CI_LOG_ERROR, "not enough memory\n");
+            return 1;
+        } 
+    }
     // 设置数据偏移量
     data_fetch_task_info.data_offset = src_data_info->data_offset;
     data_fetch_task_info.eos = 0;
     if (data_fetch_task_info.src_data_info.src_type == SAP_DATA_SRC_STREAM)
     {
         gCiasAiotRunParam.request_play_data_flag = true;
-        gCiasAiotRunParam.cloud_play_state = CLOUD_PLAY_START_DATA_WITING;
     }
 
     #if NET_AUDIO_PLAY_BY_PCM && AUDIO_COMPRESS_RECORD_DISABLE
@@ -63,6 +73,7 @@ void pdf_init(src_data_info_t *src_data_info)
     #else
     xTaskCreate(task_data_fetch, "data_fetch", 256, src_data_info, 4, &data_fetch_task_info.task_handle);
     #endif
+    return 0;
 }
 
 void pdf_deinit(void)
@@ -77,19 +88,6 @@ void pdf_deinit(void)
         taskEXIT_CRITICAL();
         vTaskDelay(1);
     }
-}
-
-void play_start_wait_data(void)
-{
-    uint16_t timeout_cnt =0;
-    while((xStreamBufferBytesAvailable(data_fetch_task_info.data_buffer) <= REQUEST_ONE_FRAME_SEZIE) 
-    && gCiasAiotRunParam.cloud_play_state == CLOUD_PLAY_START_DATA_WITING
-    && timeout_cnt<100)//等待收到2帧数据，前面pdf_fetch_data已经获取了一帧了
-    {
-        timeout_cnt++;
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-    return;
 }
 
 void task_data_fetch(void *pvParameters)
@@ -122,6 +120,7 @@ void task_data_fetch(void *pvParameters)
                 xSemaphoreGive( fetch_sem );//给出互斥量
                 data_fetch_task_info.data_offset += read_size;
             }
+            #if NET_AUDIO_PLAY_BY_PCM || NET_AUDIO_PLAY_BY_G722 || NET_AUDIO_PLAY_BY_MP3
             else
             {
                 size_t read_size = (space_size >= data_fetch_task_info.src_data_info.request_block_size) ? data_fetch_task_info.src_data_info.request_block_size : space_size;
@@ -213,7 +212,7 @@ void task_data_fetch(void *pvParameters)
                 }
 
             }
-
+            #endif
             // 更新剩余数据大小
             left_size = data_fetch_task_info.src_data_info.data_size - data_fetch_task_info.data_offset;
             // ci_logdebug(LOG_AUDIO_PLAY, "pdf left %d bytes\n", left_size);

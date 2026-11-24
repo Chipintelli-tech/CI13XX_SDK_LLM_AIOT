@@ -17,7 +17,6 @@
 #include "cias_network_msg_send_task.h"
 #include "prompt_player.h"
 #include "cias_uart_protocol.h"
-#include "audio_play_api.h"
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "cias_audio_data_handle.h"
@@ -33,7 +32,9 @@
 #define REQ_PLAY_DATA_SIZE (10 * 1024)
 
 pro_wait_acktypedef wait_ackstruct;
-audio_play_os_stream_t cur_play_stream = PLAY_NULL;
+
+extern StreamBufferHandle_t network_msg_rcv_stream_buffer;
+
 
 bool recv_music_end_sem = false;
 bool no_audio_data_flag = false;
@@ -43,7 +44,7 @@ uint8_t gwork_mode = WORKING_APPLICATION_MODE;
 
 static uint32_t response_timer_cnt = 0;
 static uint8_t *login_info = NULL;
-extern StreamBufferHandle_t network_msg_rcv_stream_buffer;
+
 extern CiasAiotRunParamTypedef gCiasAiotRunParam;
 uint32_t get_response_timer_cnt(void)
 {
@@ -142,7 +143,6 @@ void network_recv_data_task(void *parameter)
     BaseType_t err;
     cias_standard_head_t *data_header;
     uint32_t cache_empty_num = 0;
-    cur_play_stream = tts_player;
     int rx_size = 0;
     while (1)
     {

@@ -13,7 +13,7 @@ USE_CWSL_AEC_DENOISE_NN    := 2
 #DOA+AEC+DENOISE
 USE_AI_DOA_AEC_DENOISE_NN  := 3
 #######################################################################   
-CI_ALG_TYPE := $(USE_ANY_MIC_AEC_DENOISE_NN)
+CI_ALG_TYPE := $(USE_AEC_DENOISE_NN)
 
 
 ########可组合算法使能(注意:设置变量值后面不能有空格，只能是0/1/2...)########

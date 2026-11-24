@@ -21,8 +21,8 @@
 
 // SDK VER
 #define SDK_VERSION                    2
-#define SDK_SUBVERSION                 1
-#define SDK_REVISION                   2
+#define SDK_SUBVERSION                 2
+#define SDK_REVISION                   7
 #define SDK_PUB_TYPE                   "Release" //"Release"
 #define SDK_TYPE                       "ALG_PRO_AIOT"
 
@@ -681,7 +681,7 @@
 /*********************** 使用外部IIS输入语音进行识别 *************************/
 #ifndef AUDIO_IN_BUFFER_NUM
     #if USE_DENOISE_NN || USE_AI_DOA
-    #if AUDIO_DATA_UPLOAD_BY_HPOUT || USE_AUDIO_UPLOAD_BY_IIS
+    #if AUDIO_DATA_UPLOAD_BY_HPOUT || AUDIO_DATA_UPLOAD_BY_IIS
     #define AUDIO_IN_BUFFER_NUM (20)//只为DENOISE_NN和USE_AI_DOA留这么多  //hpout、iis内存足够，多预留8帧缓存
     #else
     #define AUDIO_IN_BUFFER_NUM (12)//只为DENOISE_NN和USE_AI_DOA留这么多  //至少预留12,不然会影响aec效果

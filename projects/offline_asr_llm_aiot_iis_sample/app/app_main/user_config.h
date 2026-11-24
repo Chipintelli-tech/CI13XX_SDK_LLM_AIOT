@@ -52,19 +52,8 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 //**麦克风电路模式配置
 #define MIC_DIFF_SINGLE                0   /*1,单端。0，差分（通用模块都是差分模式，省成本的模块为单端(MICN_L 接GND)时，需要配置为SINGLE）)*/
 
-//**IIS采音功能开关配置
-#define USE_IIS1_OUT_PRE_RSLT_AUDIO    0   //1,开启IIS采音功能,可以使用采音板采音,占用PA2~PA6。会多消耗20KB SYS内存 0,关闭IIS采音功能,PA2~PA6可以用于其它功能。
-#define USE_HP_OUT_PRE_RSLT_AUDIO      1
-
 //**通讯串口配置
 #define CONFIG_CI_LOG_UART             HAL_UART0_BASE  //配置log输出使用的串口，请勿与protocol共用同一个串口
-
-#define MSG_COM_USE_UART_EN            0   //0,关闭语音模块通讯协议。1,开启语音模块通讯协议。
-#define UART_PROTOCOL_NUMBER           (HAL_UART2_BASE)    //语音模块协议使用的串口，请勿与log共用同一个串口。
-#define UART_PROTOCOL_BAUDRATE         (UART_BaudRate921600) //语音模块协议使用的串口波特率。
-#define UART_PROTOCOL_VER              2   //语音模块协议版本号:1,一代协议。2,二代协议，255,平台生成协议
-
-#define IIS_UPLOAD_IS_WAKEUP           1  //1:唤醒后开始录音 0：上电后开始录音不结束
 
 #define CLOUD_UART_PROTOCOL_EN         0   //云端协议使能-只有在启英开发者平台做固件配协议能用
 #if CLOUD_UART_PROTOCOL_EN
@@ -79,18 +68,8 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #define UART0_PAD_OPENDRAIN_MODE_EN     0   //0,UART0为推挽模式。1,UART0为开漏模式。
 #define UART1_PAD_OPENDRAIN_MODE_EN     0   //0,UART1为推挽模式。1,UART1为开漏模式。
 #define UART2_PAD_OPENDRAIN_MODE_EN     0   //0,UART2为推挽模式。1,UART2为开漏模式。
-
-//**OTA配置 当前版本不支持
-#define OTA_TIMOUT                  3 //数据超时时间，单位秒
-#define OTA_RETRY_TIME              10//数据重复发送次数
-#if (USE_CI_D06GT01D_BOARD == 1)
-#define OTA_CHIP_TYPE_1306          1
-#elif (USE_CI_D06GT01J_BOARD == 1)
-#define OTA_CHIP_TYPE_1306          1
-#else
-#define OTA_CHIP_TYPE_1306          0
-#endif  
-
+// ota使能
+#define CI_OTA_ENABLE                   0   // 1使能 0 不
 
 //**时钟源配置
 #ifndef USE_EXTERNAL_CRYSTAL_OSC
@@ -119,26 +98,43 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #endif
 #endif
 /********************************************离在线参数宏配置开始********************************************/
-//*语音上传(通过HPOUT输出)
-#ifndef AUDIO_DATA_UPLOAD_BY_HPOUT
-#define AUDIO_DATA_UPLOAD_BY_HPOUT                      (1)            //通过串口上传语音功能配置，消耗75KB内存
+//*语音上传(通过IIS输出)
+#ifndef AUDIO_DATA_UPLOAD_BY_IIS
+#define AUDIO_DATA_UPLOAD_BY_IIS                       (1)            //通过IIS上传语音功能配置，消耗12KB内存
 #endif
+
+#ifndef AUDIO_DATA_PLAY_BY_IIS
+#define AUDIO_DATA_PLAY_BY_IIS                         (1)            //通IIS接收音频数据播放配置
+#endif
+
+#define WIFI_CMD_BY_UART                               (1)            //通过串口和wifi指令交互配置
+
+#define IIS_UPLOAD_IS_WAKEUP                              1           //1:唤醒后或者收到开始录音指令后开始录音 0：上电后开始录音不结束
+#define IIS_DOWNLOAD_BY_CMD                               1           //1:在收到指令后开始IIS播报 0：上电后开始IIS播报
 
 #define  AUDIO_VAD_CHECK_ENABLE                           0            //vad 检测使能-不可修改
 
-//hpout输出录音数据方案，不支持播放，只能通过hpout输出pcm数据
+//IIS输出录音数据方案，只能通过IIS输出pcm数据
 #define AUDIO_COMPRESS_RECORD_DISABLE                     1            //PCM上传数据，不做数据压缩
 //和WiFi交互是否带协议头
 #define AUDIO_SEND_WITH_PROTOCOL_HEADER                   1            //1-带协议头上传(默认) 0-不带协议直接传裸数据-调试使用
-
-#define USE_HP_OUT_NET_AUDIO                              1             //使用hpout直接输出云端音频          
+     
 #define AUDIO_PLAY_MODE                                   1             //1-支持打断当前播放 0-不支持，顺序播放-暂时不用
 #define UPLOAD_NNDENOISE_AUDIO_DATA_ENABLE                1             //1-上传降噪的音频 0-上传非降噪的音频
 
+#define LOCAL_REC_VAD_END_ENABLE                          0             //本地识别后立即停止VAD
+#define WEAK_VAD_ENABLE                                   0             //1：唤醒后开始检测VAD  0：一直检测VAD
+
+//VAD算法内部是否进行超时检测
+#define VAD_TIMEOUT_CHECK                                 1            //0-不进行超时检测 1-进行超时检测-不可修改
+//强制结束录音时间
+#define VAD_FORCE_OVER_NUM_TIME                           5            //强制结束录音的时间(单位S)，上传音频 
 
 //和WiFi通信串口及参数配置
+#if WIFI_CMD_BY_UART
 #define UART_NUM_SEND_PLAY_AUDIO_NUMBER                  HAL_UART1_BASE           //网络端交互的串口
 #define UART_NUM_SEND_PLAY_AUDIO_BAUDRATE                UART_BaudRate921600      //网络端交互的串口波特率
+#endif
 #define NETWORK_RECV_BUFF_MAX_SIZE                       (256 + 16)               //接收网络端串口数据最大size-帧头+预留4字节
 #define NETWORK_SEND_BUFF_MAX_SIZE                       (256 + 16)               //发送串口数据到网络端最大size,pcm数据分4包传输，避免丢数据
 #define NETWORK_SEND_BUFF_NUM                             5                       //发送串口数据到网络端缓冲区个数  
@@ -187,13 +183,11 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #define EXIT_WAKEUP_TIME                30*1000   //退出唤醒超时时间,单位毫秒。超过此配置指定的时间长度内没有识别到任何命令词，就会切换到只监听唤词状态。
     
 //**播放器配置  
-#if  USE_HP_OUT_NET_AUDIO
+#if  AUDIO_DATA_PLAY_BY_IIS
 #define AUDIO_PLAYER_ENABLE             0   //是否启用音频播放器。0:不启用,1:启用。不时用播放功能时，启用本地mp3播放器多占用52KB内存
 #else
 #define AUDIO_PLAYER_ENABLE             1   //是否启用音频播放器。0:不启用,1:启用。不时用播放功能时，启用本地mp3播放器多占用52KB内存
 #endif
-#define AUDIO_PLAYER_ENABLE             0   //是否启用音频播放器。0:不启用,1:启用。不时用播放功能时，启用本地mp3播放器多占用52KB内存
-                                            //关闭此功能可以节省内存空间。
 #define PLAYER_CONTROL_PA               0   //是否有播放器控音频功放开关。0:功放常开,1:播放器在需要播放时才打开,但可能增加一点每一次播放的延迟时间
 #define VOLUME_MAX                      7   //设置音量调节的上限值，对应硬件支持的最大音量。
 #define VOLUME_MIN                      1   //设置音量调节的下限值，对应最小音量。
@@ -209,6 +203,11 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 #endif
 #endif
 
+//离在线主要使用与WIFI通信的串口，根据需求增加该串口
+#define MSG_COM_USE_UART_EN            0   //0,关闭语音模块通讯协议。1,开启语音模块通讯协议。
+#define UART_PROTOCOL_NUMBER           (HAL_UART2_BASE)    //语音模块协议使用的串口，请勿与log共用同一个串口。
+#define UART_PROTOCOL_BAUDRATE         (UART_BaudRate921600) //语音模块协议使用的串口波特率。
+#define UART_PROTOCOL_VER              2   //语音模块协议版本号:1,一代协议。2,二代协议，255,平台生成协议
 
 #define BF_DEEPSE_MODE                  1   //1:全深度分离更耗内存(单双网络都可以用) 0：半深度分离(唤醒词做深度分离，命令词不做，只能用双网络)
 #define BF_ASR_VALID_MODE               0   //1:开启ASR打分是否有效判断功能 0：关闭ASR打分是否有效判断功能 该功能只针对全深度分离和半深度分离
@@ -340,13 +339,14 @@ chipintelli提供的部分开发板和模组，可以通过下面的宏选择，
 
 #if USE_AEC_MODULE && (USE_BEAMFORMING_MODULE  || USE_AI_DOA || USE_DEREVERB_MODULE || USE_DUAL_MIC_ANY)  //双mic + aec算法必须外部挂codec作为信号回采(推荐7243e)
 #define IF_USE_ANOTHER_CODEC_TO_GET_REF 1
+#define INNER_CODEC_AUDIO_IN_USE_RESAMPLE 0 //确保IIS0 output和input采样率一致，默认output为16k，若需重采样，则修改output为32k，拿到处理后音频也需要16k升采样到32k
 #if (USE_CI_D06GT01J_BOARD != 1) && (USE_CI_E0XGTD02S_BOARD != 1)  //必须外挂codec使用USE_CI_D06GT01J_BOARD板级
-#error "dual mic alg + aec , must use USE_CI_D06GT01J_BOARD board\n"
+//#error "dual mic alg + aec , must use USE_CI_D06GT01J_BOARD board\n"
 #endif
 #endif
-#if USE_CI_D06GT01J_BOARD
-#error "iis sample not support dual mic alg + aec\n"
-#endif
+// #if USE_CI_D06GT01J_BOARD
+// #error "iis sample not support dual mic alg + aec\n"
+// #endif
 #if USE_BEAMFORMING_MODULE && USE_PWK
  #error "bf + pwk algorithm, not support\n"
 #endif

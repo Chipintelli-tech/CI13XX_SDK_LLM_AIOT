@@ -16,7 +16,6 @@
 #include "timers.h"
 #include "semphr.h"
 #include "ci_log.h"
-#include "audio_play_api.h"
 #include "sed_app_host.h"
 #include "cias_network_msg_protocol.h"
 #include "cias_network_msg_send_task.h"
@@ -47,6 +46,11 @@
 #include "middle_device.h"
 #include "ir_uart_msg_deal.h"
 #include "buzzer_voice.h"
+#endif
+#if SIMPLE_AUDIO_PLAYER_ENABLE
+#include "simple_audio_player.h"
+#else
+#include "audio_play_api.h"
 #endif
 #if IIS_CHANNEL_ENG_CALC_EANBLE
 #include "cias_factory_test.h"
@@ -113,7 +117,11 @@ void change_wakeup_period(uint32_t exit_wakup_ms)
  */
 bool check_current_playing(void)
 {
+#if SIMPLE_AUDIO_PLAYER_ENABLE
+    if (sap_get_state() != SAP_STATE_IDLE)
+#else
     if(AUDIO_PLAY_STATE_IDLE != get_audio_play_state())
+#endif
     {
         return true;
     }
@@ -314,7 +322,9 @@ void set_state_exit_wakeup(void)
     xTimerStop(exit_wakeup_timer,0);
     sys_manage_data.wakeup_state = SYS_STATE_UNWAKEUP;
     sys_manage_data.is_fisrt_wakeup_state = true;
+    #if WEAK_VAD_ENABLE
     ciss_set(CI_SS_WAKING_UP_STATE,CI_SS_NO_WAKEUP);
+    #endif
     ciss_set(CI_SS_WAKING_UP_STATE_FOR_SSP,CI_SS_NO_WAKEUP);
     ciss_set(CI_SS_CMD_STATE,CI_SS_CMD_IS_NULL);
     ciss_set(CI_SS_CMD_STATE_FOR_SSP,CI_SS_CMD_IS_NULL);
@@ -849,11 +859,9 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
         ciss_set(CI_SS_CMD_SCORE,asr_msg->asr_score);
         if(cmd_info_is_wakeup_word(cmd_handle)) /*wakeup word*/
         {
-            #if AUDIO_DATA_UPLOAD_BY_UART
-                mprintf("----voice_upload_enable---\n");
-                asr_wakeup_on_handle();
-                weakup_asr_hander = cmd_handle;
-            #endif
+            mprintf("----voice_upload_enable---\n");
+            asr_wakeup_on_handle();
+            weakup_asr_hander = cmd_handle;
             /*updata wakeup state*/
             ciss_set(CI_SS_CMD_STATE,CI_SS_CMD_IS_WAKEUP);
             ciss_set(CI_SS_CMD_STATE_FOR_SSP,CI_SS_CMD_IS_WAKEUP);
@@ -877,7 +885,6 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
         }
         else if (SYS_STATE_WAKEUP == get_wakeup_state())
         {
-            #if AUDIO_DATA_UPLOAD_BY_UART
             mprintf("----cias_aiot_vad_end_handle---\n");
             if(cmd_handle == weakup_asr_hander)
             {	
@@ -890,7 +897,6 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
                // cias_send_cmd(LOCAL_ASR_RESULT_NOTIFY, DEF_FILL);
                 mprintf("====LOCAL_ASR_RESULT_NOTIFY===\n");
             }
-            #endif
             ciss_set(CI_SS_CMD_STATE,CI_SS_CMD_IS_NORMAL);
             ciss_set(CI_SS_CMD_STATE_FOR_SSP,CI_SS_CMD_IS_NORMAL);
             set_state_enter_wakeup(gCiasAiotFuncParam.wake_up_continue_timeout*1000);
@@ -898,15 +904,16 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
             uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
             uint16_t cmd_id = cmd_info_get_command_id(cmd_handle);
 #if !UPLOAD_PCM_DATA_ENABLE
-            gCiasAiotRunParam.is_vad_on_flag = false;
             uint8_t cmd_id_buf[2] = {0};
             cmd_id_buf[0]= (cmd_id & 0xff);
             cmd_id_buf[1] = ((cmd_id >> 8) & 0xff);
             cias_send_cmd_and_data(LOCAL_ASR_RESULT_NOTIFY, cmd_id_buf, 2, DEF_FILL);  // 发送本地识别通知  
+            #if LOCAL_REC_VAD_END_ENABLE
             //重置录音参数
             gCiasAiotRunParam.is_vad_on_flag = false;
             gCiasAiotRunParam.local_asr_finish_flag = true;
-        //    cias_aiot_vad_end_handle(1);
+            cias_aiot_vad_end_handle(1);
+            #endif
 #endif
             ci_loginfo(LOG_USER,"asr cmd_id:%d,semantic_id:%08x\n", cmd_id, semantic_id);
             
@@ -995,11 +1002,9 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
         ciss_set(CI_SS_CMD_SCORE,asr_msg->asr_score);
         if(cmd_info_is_wakeup_word(cmd_handle)) /*wakeup word*/
         {
-            #if AUDIO_DATA_UPLOAD_BY_UART
-                mprintf("----voice_upload_enable---\n");
-                asr_wakeup_on_handle();
-                weakup_asr_hander = cmd_handle;
-            #endif  
+            mprintf("----voice_upload_enable---\n");
+            asr_wakeup_on_handle();
+            weakup_asr_hander = cmd_handle; 
             #if USE_IR_ENABEL
             uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
             if (MAIN_ASR_ONESHORT_OPEN_AIR == semantic_id)
@@ -1021,7 +1026,6 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
         }
         else if (SYS_STATE_WAKEUP == get_wakeup_state())
         {
-        #if AUDIO_DATA_UPLOAD_BY_UART
             if(cmd_handle == weakup_asr_hander)
             {	
                 mprintf("----cias_aiot_vad_end_handle---\r\n");
@@ -1033,7 +1037,6 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
                 gCiasAiotRunParam.cloud_parse_is_busy_flag = false;
                 mprintf("====LOCAL_ASR_RESULT_NOTIFY===\r\n");
             }
-        #endif
             ciss_set(CI_SS_CMD_STATE,CI_SS_CMD_IS_NORMAL);
             ciss_set(CI_SS_CMD_STATE_FOR_SSP,CI_SS_CMD_IS_NORMAL);
             set_state_enter_wakeup(gCiasAiotFuncParam.wake_up_continue_timeout*1000);
@@ -1043,15 +1046,16 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
             uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
             uint16_t cmd_id = cmd_info_get_command_id(cmd_handle);
 #if !UPLOAD_PCM_DATA_ENABLE
-            gCiasAiotRunParam.is_vad_on_flag = false;
             uint8_t cmd_id_buf[2] = {0};
             cmd_id_buf[0]= (cmd_id & 0xff);
             cmd_id_buf[1] = ((cmd_id >> 8) & 0xff);
             cias_send_cmd_and_data(LOCAL_ASR_RESULT_NOTIFY, cmd_id_buf, 2, DEF_FILL);  // 发送本地识别通知  
+            #if LOCAL_REC_VAD_END_ENABLE
             //重置录音参数
             gCiasAiotRunParam.is_vad_on_flag = false;
             gCiasAiotRunParam.local_asr_finish_flag = true;
-        //    cias_aiot_vad_end_handle(1);
+            cias_aiot_vad_end_handle(1);
+            #endif
 #endif
             ci_loginfo(LOG_USER,"asr cmd_id:%d,semantic_id:%08x\n", cmd_id, semantic_id);
             #ifdef IR_DEVICE_ALL
@@ -1130,7 +1134,7 @@ void UserTaskManageProcess(void *p_arg)
     #endif
     vTaskSuspendAll();
 
-    #if (USE_BEAMFORMING_MODULE && USE_AEC_MODULE)
+    #if ((USE_BEAMFORMING_MODULE && USE_AEC_MODULE) || !WEAK_VAD_ENABLE)
     ciss_set(CI_SS_WAKING_UP_STATE,CI_SS_WAKEUPED);
     ciss_set(CI_SS_WAKING_UP_STATE_FOR_SSP,CI_SS_WAKEUPED);
     #else

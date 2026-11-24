@@ -21,7 +21,7 @@
 #include "stream_buffer.h"
 #include "semphr.h"
 
-#if AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_UPLOAD_BY_UART
+#if WIFI_CMD_BY_UART || AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_UPLOAD_BY_UART
 
 extern SemaphoreHandle_t network_send_sem ;
 StreamBufferHandle_t network_msg_rcv_stream_buffer = NULL;  // WiFi数据消息接收缓存

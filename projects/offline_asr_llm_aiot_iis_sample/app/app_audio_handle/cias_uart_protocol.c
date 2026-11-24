@@ -23,10 +23,8 @@
 #include "audio_play_api.h"
 #include "stream_buffer.h"
 
-#if AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_UPLOAD_BY_UART
+#if WIFI_CMD_BY_UART
 StreamBufferHandle_t network_msg_rcv_stream_buffer = NULL;  // WiFi数据消息接收缓存
-extern audio_play_os_stream_t mp3_player;
-extern audio_play_os_sem_t mp3_player_end;
 uint32_t uart_rx_toatal = 0;
 uint16_t uart1_index_total = 0;
 extern SemaphoreHandle_t network_send_sem ;

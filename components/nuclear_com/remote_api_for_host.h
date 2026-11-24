@@ -23,7 +23,6 @@ extern void RC_HOST_CALLER(set_drc_config_str(void* p));
 extern int  RC_HOST_CALLER(get_aes_state)();
 extern void RC_HOST_CALLER(req_tts_cmpt)(int type,float* dest_addr,float* res_addr);
 extern void RC_HOST_CALLER(req_tts_mgc2sp)(float* mgc, float* sp_fe);
-extern void RC_BNPU_CALLER(print_bnpu_err_type_in_host)(int bnpu_err_type);
 #endif
 #endif
 

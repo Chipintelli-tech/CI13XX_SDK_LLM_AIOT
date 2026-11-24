@@ -236,6 +236,7 @@ typedef enum
     audio_pre_rslt_write_data_ept_num,              //103
     cm_set_codec_alc_ept_num,                       //104
     cm_set_codec_adc_gain_ept_num,                  //105
+	cm_get_codec_alc_state_ept_num,                 //106
 
     cinn_malloc_in_host_sram_ept_num,               //106
     cinn_free_in_host_sram_ept_num,                 //107

@@ -46,7 +46,6 @@
 #include "code_switch.h"
 #include "ci_nlp_user.h"
 #include "ci_nlp.h"
-#include "ota_config.h"
 #include "cias_network_msg_protocol.h"
 #include "timers.h"
 #include "ci_agc.h"
@@ -325,7 +324,6 @@ static void task_init(void *p_arg)
     ciss_set(CI_SS_NN_DENOISE_WORK_STATE, 1);
     ciss_set(CI_SS_VOX_SET_END_CONFIDENCE, VOX_VAD_END_CONFIDENCE_DEFAULT);
     ciss_set(CI_SS_ALG_DEBUG_STATE, 0);  //开启前端算法调试
-	ciss_set(CI_SS_AEC_DEALY_HANDLE_FRAME, 60);
     extern vox_config_t vox_config;
     uint8_t vox_thre_db = VOX_VAD_THRE_DB_DEFAULT;
     if(vox_thre_db >= 45 && vox_thre_db <= 48)

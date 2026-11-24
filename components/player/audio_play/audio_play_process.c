@@ -1927,15 +1927,23 @@ void task_audio_play(void *pvParameters)
             }
             cias_send_cmd(LOCAL_AUDIO_PLAY_START, DEF_FILL);
             ci_loginfo(LOG_AUDIO_PLAY, "play start\n");
-            #if (PLAYER_CONTROL_PA)
-            audio_play_hw_pa_da_ctl(ENABLE, true);
-            vTaskDelay(pdMS_TO_TICKS(100));
-            #endif
+
             gCiasAiotRunParam.mp3_play_finish_flag = false;
             ci_logdebug(LOG_AUDIO_PLAY, "play type %d\n", play_msg.play_data_type);
 
             audio_play_state = AUDIO_PLAY_STATE_START;
             ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING);
+            #if (PLAYER_CONTROL_PA)
+            if(!gCiasAiotRunParam.pa_start_flag)
+            {
+                audio_play_hw_pa_da_ctl(ENABLE, true);
+                gCiasAiotRunParam.pa_start_flag =true;
+                mprintf("pa_on\r\n");
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+            #else
+                audio_play_hw_pa_da_ctl(ENABLE,false);
+            #endif
             break;
         }
         case AUDIO_PLAY_STATE_START:
@@ -2255,9 +2263,9 @@ void task_audio_play(void *pvParameters)
             #endif
             ci_loginfo(LOG_AUDIO_PLAY, "play end1\n");
             mprintf("ciss_get(CI_SS_PLAY_STATE) = %d\r\n", ciss_get(CI_SS_PLAY_STATE));
-            #if (PLAYER_CONTROL_PA)
-                audio_play_hw_pa_da_ctl(DISABLE, true);
-            #endif
+            // #if (PLAYER_CONTROL_PA)
+            //     audio_play_hw_pa_da_ctl(DISABLE, true);
+            // #endif
             /* 调用结束回调函数 */
             do_call_callback_fun();
             cias_send_cmd(LOCAL_AUDIO_PLAY_STOP, DEF_FILL);
