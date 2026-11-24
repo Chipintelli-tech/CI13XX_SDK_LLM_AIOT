@@ -16,7 +16,6 @@
 #include "timers.h"
 #include "semphr.h"
 #include "ci_log.h"
-#include "audio_play_api.h"
 #include "sed_app_host.h"
 #include "cias_network_msg_protocol.h"
 #include "cias_network_msg_send_task.h"
@@ -26,7 +25,6 @@
 #include "ci130x_iis.h"
 #include "ci130x_lowpower.h"
 #include "ci130x_core_misc.h"
-// #include "ci130x_audio_capture.h"
 #include "voice_module_uart_protocol.h"
 #include "prompt_player.h"
 #include "product_semantic.h"
@@ -37,16 +35,20 @@
 #include "status_share.h"
 #include "codec_manager.h"
 #include "remote_api_for_host.h"
-#include "ci_nlp_control.h"
-#include "ci_nlp.h"
+
 #include "cwsl_manage.h"
 #include "cias_voice_upload.h"
 #include "cias_aiot_protocol.h"
-#if USE_IR_ENABEL
+#if USE_IR_ENABLE
 #include "main_device.h"
 #include "middle_device.h"
 #include "ir_uart_msg_deal.h"
 #include "buzzer_voice.h"
+#endif
+#if SIMPLE_AUDIO_PLAYER_ENABLE
+#include "simple_audio_player.h"
+#else
+#include "audio_play_api.h"
 #endif
 #if IIS_CHANNEL_ENG_CALC_EANBLE
 #include "cias_factory_test.h"
@@ -97,7 +99,7 @@ static int8_t ignore_exit_wakeup = 0;
 static int8_t ignore_asr_msg = 0;
 
 extern CiasAiotRunParamTypedef gCiasAiotRunParam;;
-#if USE_IR_ENABEL
+#if USE_IR_ENABLE
 static int exit_wakeup_timeout = gCiasAiotFuncParam.wake_up_continue_timeout*1000;
 
 void change_wakeup_period(uint32_t exit_wakup_ms)
@@ -113,7 +115,11 @@ void change_wakeup_period(uint32_t exit_wakup_ms)
  */
 bool check_current_playing(void)
 {
+#if SIMPLE_AUDIO_PLAYER_ENABLE
+    if (sap_get_state() != SAP_STATE_IDLE)
+#else
     if(AUDIO_PLAY_STATE_IDLE != get_audio_play_state())
+#endif
     {
         return true;
     }
@@ -171,12 +177,12 @@ void pause_asr(uint8_t voice_in_mute, uint8_t pause_asr_task)
     }
     
     #if USE_AEC_MODULE
-    //    ciss_set(CI_SS_INTERCEPT_ASR_OUT, 1);
+    ciss_set(CI_SS_INTERCEPT_ASR_OUT, 1);
     #endif
 
     sys_manage_data.pause_asr_count++;
 #endif
-#if USE_IR_ENABEL
+#if USE_IR_ENABLE
       xTimerStop(exit_wakeup_timer,0);
 #endif
 }
@@ -205,16 +211,16 @@ void  resume_asr()
             }
 
             #if USE_AEC_MODULE
-            // if (sys_manage_data.intercept_timer_handle == NULL)
-            // {
-            //     sys_manage_data.intercept_timer_handle = xTimerCreate("intercept_timer", pdMS_TO_TICKS(500),pdFALSE, (void *)0, intercept_timer_callback);
-            // }
-            // xTimerStart(sys_manage_data.intercept_timer_handle, 0);
+            if (sys_manage_data.intercept_timer_handle == NULL)
+            {
+                sys_manage_data.intercept_timer_handle = xTimerCreate("intercept_timer", pdMS_TO_TICKS(500),pdFALSE, (void *)0, intercept_timer_callback);
+            }
+            xTimerStart(sys_manage_data.intercept_timer_handle, 0);
             #endif
         }
     }
 #endif
-    #if USE_IR_ENABEL
+    #if USE_IR_ENABLE
     if (sys_manage_data.wakeup_state == SYS_STATE_WAKEUP)
     {
         xTimerChangePeriod(exit_wakeup_timer, pdMS_TO_TICKS(exit_wakeup_timeout),0);/*or used a new timer*/
@@ -345,7 +351,7 @@ void exit_down_freq_mode_cb(TimerHandle_t xTimer)
         if(( 0 == asrtop_sys_isbusy())&&(AUDIO_PLAY_STATE_IDLE == get_audio_play_state()))
         {
             pause_asr(0, 1);
-            #if (USE_DENOISE_MODULE)
+            #if (USE_TRA_DENOISE)
             power_mode_switch(POWER_MODE_DOWN_FREQUENCY);
             #else
             power_mode_switch(POWER_MODE_OSC_FREQUENCY);
@@ -426,7 +432,7 @@ void change_asr_wakeup_word(void)
     // 晶振时钟模式，可以产生VAD START，不能识别需要在VAD START中断内切换到正常模式才可以识别
     pause_asr(0, 1);
 
-    #if (USE_DENOISE_MODULE)
+    #if (USE_TRA_DENOISE)
     power_mode_switch(POWER_MODE_DOWN_FREQUENCY);
     #else
     power_mode_switch(POWER_MODE_OSC_FREQUENCY);
@@ -504,7 +510,7 @@ void play_exit_wakeup_done_cb(cmd_handle_t cmd_handle)
     send_msg.msg_data.cmd_info_data.cmd_info_status = MSG_CMD_INFO_STATUS_POST_CHANGE_ASR_WAKEUP_WORD;
     send_msg_to_sys_task(&send_msg, NULL);
     mprintf("inactivate\n");
-    #if USE_IR_ENABEL
+    #if USE_IR_ENABLE
     user_led_light_flash();
     #endif
 
@@ -560,7 +566,7 @@ void exit_wakeup_deal(uint32_t asr_busy_check)
     vpr_delete_all_flag = 0;
     g_voice_print_rec_index = -1;
     #endif
-    #if USE_IR_ENABEL
+    #if USE_IR_ENABLE
     main_device_overLearnIR(pdFALSE, 0);
     #endif
     xSemaphoreGive(WakeupMutex);
@@ -628,7 +634,7 @@ void enter_wakeup_deal(uint32_t exit_wakup_ms, cmd_handle_t cmd_handle )
             }
         #endif
 
-        #if USE_IR_ENABEL
+        #if USE_IR_ENABLE
         if (NULL != DeviceGetLearnModeDevice())
         {
             //有匹配的时候 退出匹配状态
@@ -859,7 +865,7 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
             ciss_set(CI_SS_CMD_STATE_FOR_SSP,CI_SS_CMD_IS_WAKEUP);
             if (cwsl_get_status() != CWSL_STA_REG_TEMPLATE)
             {
-                #if USE_IR_ENABEL
+                #if USE_IR_ENABLE
                 uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
                 if (MAIN_ASR_ONESHORT_OPEN_AIR == semantic_id)
                 {
@@ -925,18 +931,10 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
                             #if (COMMAND_INFO_VER == 3)
                             if (cmd_info_is_auto_play(cmd_handle))
                             {
-                                #if MULT_INTENT > 1
-                                prompt_play_by_cmd_handle(cmd_handle, -1, default_play_done_callback,false);
-                                #else
                                 prompt_play_by_cmd_handle(cmd_handle, -1, default_play_done_callback,true);
-                                #endif
                             }
                             #else
-                            #if MULT_INTENT > 1
-                            prompt_play_by_cmd_handle(cmd_handle, -1, default_play_done_callback,false);
-                            #else
                             prompt_play_by_cmd_handle(cmd_handle, -1, default_play_done_callback,true);
-                            #endif
                             #endif
                         }
                         #endif
@@ -997,7 +995,7 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
             mprintf("----voice_upload_enable---\n");
             asr_wakeup_on_handle();
             weakup_asr_hander = cmd_handle;
-            #if USE_IR_ENABEL
+            #if USE_IR_ENABLE
             uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
             if (MAIN_ASR_ONESHORT_OPEN_AIR == semantic_id)
             {
@@ -1062,18 +1060,10 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
                     #if (COMMAND_INFO_VER == 3)
                     if (cmd_info_is_auto_play(cmd_handle))
                     {
-                        #if MULT_INTENT > 1
-                        prompt_play_by_cmd_handle(cmd_handle, -1, default_play_done_callback,false);
-                        #else
                         prompt_play_by_cmd_handle(cmd_handle, -1, default_play_done_callback,true);
-                        #endif
                     }
                     #else
-                    #if MULT_INTENT > 1
-                    prompt_play_by_cmd_handle(cmd_handle, -1, default_play_done_callback,false);
-                    #else
                     prompt_play_by_cmd_handle(cmd_handle, -1, default_play_done_callback,true);
-                    #endif
                     #endif
                     #endif
                 }
@@ -1109,10 +1099,6 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
  * @param p_arg
  */
 
-extern int asr_result_callback_nlp(char *cmd, int cfd, int decoded_frames, short sli_cfd, short path_node_cfd, short start_frame, short frame_len);
-uint8_t gs_semantic_count = 0;
-uint8_t gs_send_semantic_idx = 0;
-int gs_play_semantic_id_list[] =  { -1,-1,-1,-1};  
 
 void UserTaskManageProcess(void *p_arg)
 {
@@ -1135,7 +1121,7 @@ void UserTaskManageProcess(void *p_arg)
     #endif    
     xTaskResumeAll();
     /* 退出唤醒timer和led pwm控制timer 初始化 */
-    #if USE_IR_ENABEL
+    #if USE_IR_ENABLE
     exit_wakeup_timer = xTimerCreate("exit_wakeup", pdMS_TO_TICKS(exit_wakeup_timeout),
         pdFALSE, (void *)0, exit_wakeup_timer_callback);
     #else
@@ -1177,38 +1163,7 @@ void UserTaskManageProcess(void *p_arg)
                     sys_deal_asr_msg(asr_rev_data);
                     break;
                 }
-				case SYS_MSG_TYPE_NLP:
-                {
-                    if(rev_msg.msg_data.asr_data.nlp_data.flag == 1)
-                    {
-                        asr_result_callback_nlp("。", 3221, 1, 0, 0, 0, 0);
-                    }
-                    else if(rev_msg.msg_data.asr_data.nlp_data.flag == 2)
-                    {
-                        asr_result_callback_nlp("。", 3222, 1, 0, 0, 0, 0);
-                    }
-                    else if(rev_msg.msg_data.asr_data.nlp_data.flag == 3)
-                    {
-                        asr_result_callback_nlp("。", 3223, 1, 0, 0, 0, 0);
-                    }
-                       
-                    break;
-                }
-                case SYS_MSG_TYPE_NLP_RESULT:
-                {
-                    uint8_t i;
-                    gs_semantic_count = rev_msg.msg_data.asr_data.nlp_data.intent_count;
-                    for(i=0; i<gs_semantic_count;i++)
-                    {
-                        cmd_handle_t cmd_handle = cmd_info_find_command_by_string(rev_msg.msg_data.asr_data.nlp_data.intent[i]);
-                        sys_msg_t send_msg;
-                        send_msg.msg_type = SYS_MSG_TYPE_ASR;
-                        send_msg.msg_data.asr_data.asr_status = MSG_ASR_STATUS_GOOD_RESULT;
-                        send_msg.msg_data.asr_data.asr_cmd_handle = cmd_handle;
-                        send_msg_to_sys_task(&send_msg, NULL);
-                    }
-                    break;
-                }
+
 
                 /* 系统控制消息，主要通知处理识别模型切换以及低功耗模式切换的请求 */
                 case SYS_MSG_TYPE_CMD_INFO:
@@ -1316,6 +1271,45 @@ void UserTaskManageProcess(void *p_arg)
     }
 }
 
+//bnpu参数配置
+void bnpu_dnn_param_cfg(void)
+{
+     //获取模型ASR地址
+    ciss_set(CI_SS_DNN_MODEL_FLASH_ADDR1, 0x0);
+    ciss_set(CI_SS_DNN_MODEL_FLASH_ADDR2, 0x0);
+    ciss_set(CI_SS_DNN_MODEL_FLASH_ADDR3, 0x0);
+    ciss_set(CI_SS_DNN_MODEL_FLASH_ADDR4, 0x0);
+    ciss_set(CI_SS_DNN_MODEL_FLASH_ADDR5, 0x0);
+    //解析模型，分配dnn内存
+    for(int i = 0;  i <= DNN_NUM_CHECK_MAX; i++)
+	{	
+		void* addr = NULL;
+		uint32_t size = 0;
+		get_dnn_addr_by_id((uint16_t)i, &addr, &size);
+		if(addr)
+		{
+			addr = (void*)((int8_t*)addr + FLASH_CPU_READ_BASE_ADDR);
+		}
+        switch(i)
+        {
+            case 0:
+                ciss_set(CI_SS_DNN_MODEL_FLASH_ADDR1, addr);
+                break;
+            case 1:
+                ciss_set(CI_SS_DNN_MODEL_FLASH_ADDR2, addr);
+                break;
+            case 2:
+                ciss_set(CI_SS_DNN_MODEL_FLASH_ADDR3, addr);
+                break;
+            case 3:
+                ciss_set(CI_SS_DNN_MODEL_FLASH_ADDR4, addr);
+                break;
+            case 4:
+                ciss_set(CI_SS_DNN_MODEL_FLASH_ADDR5, addr);
+                break;
+        }
+	}
+}
 #if USE_PWK
 void ci_pwk_get_cb(int db_val)
 {
@@ -1323,8 +1317,8 @@ void ci_pwk_get_cb(int db_val)
 }
 #endif
 
-void  ci_bnpu_err_print(int err_type)
+//暂时保留
+int asr_result_callback_nlp(char *cmd, int cfd, int decoded_frames, short sli_cfd, short path_node_cfd, short start_frame, short frame_len)
 {
-    mprintf("bnpu err_type = %d\r\n", err_type);
-}
 
+}

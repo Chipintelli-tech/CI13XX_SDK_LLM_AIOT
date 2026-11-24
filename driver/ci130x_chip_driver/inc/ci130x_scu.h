@@ -21,17 +21,13 @@ extern "C" {
 // 注意，为了使CODE在多种采样率下都能得到整数倍分频，驱动中会自动对主频做一些调整（+/-4092MHz以内），所以实际运行频率肯能与这里配置的频率有差异。
 // 准确频率可以通过调用 "dpmu_get_pll_frequency()" 函数获取。
 #if USE_EXTERNAL_CRYSTAL_OSC
-#define MAIN_FREQUENCY          246000000     /*外部晶振*/
+#define MAIN_FREQUENCY          254000000     /*外部晶振*/
 #else
 #define MAIN_FREQUENCY          220000000     /*内部晶振*/
 #endif
 
-#if USE_BLE
-#define SRC_FREQUENCY_NORMAL    16000000U
-#else
-#define SRC_FREQUENCY_NORMAL    12288000U
-#endif
 
+#define SRC_FREQUENCY_NORMAL    12288000U
 #define SRC_FREQUENCY_LOWPOWER  12288000U
 
 

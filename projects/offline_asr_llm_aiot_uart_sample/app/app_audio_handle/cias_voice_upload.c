@@ -59,9 +59,9 @@ CiasAiotRunParamTypedef gCiasAiotRunParam =
 };
 CiasAiotFuncParamTypedef gCiasAiotFuncParam =
 {
-        .vad_filter_frame = VAD_ON_MIN_NUM,
-        .vad_end_mute_param_index = VOX_VAD_END_CONFIDENCE_DEFAULT,
-        .vad_start_max_timeout = VAD_FORCE_OVER_NUM_TIME,
+        // .vad_filter_frame = VAD_ON_MIN_NUM,
+      //  .vad_end_mute_param_index = VOX_VAD_END_CONFIDENCE_DEFAULT,
+        .vad_start_max_timeout = VAD_TIMEOUT_VALUE ,
         .wake_up_continue_timeout = EXIT_WAKEUP_TIME / 1000, // 以S为单位
         .interaction_multi_round = CUR_INTERACTION_MULTI_ROUND_ENABLE,
         .upload_play_full_duplex = UPLOAD_PLAY_FULL_DUPLEX_ENABLE,
@@ -70,6 +70,10 @@ CiasAiotFuncParamTypedef gCiasAiotFuncParam =
         .upload_audio_by_denoise = UPLOAD_NNDENOISE_AUDIO_DATA_ENABLE,
         .is_play_exit_wakeup_voice = true,
         .is_play_enter_wakeup_voice = true,
+#if AUTO_GET_AEC_GAIN
+        .aec_gain_get_state = GET_AEC_GAIN_IDLE,
+        .aec_min_mic_gain = 0,
+#endif
 #if IIS_CHANNEL_ENG_CALC_EANBLE
         .upload_factory_test_real_val_flag = CIAS_UPLOD_FACTORY_TEST_REAL_VAL,
         .micl_db_thr_val = CIAS_HAVE_AUDIO_ENG_MICL,
@@ -153,6 +157,9 @@ void asr_wakeup_on_handle(void)
     }
 #endif
     ciss_set(CI_SS_VOX_VAD_CLEAR, 1); // 唤醒之后必须清除状态，解决唤醒后马上路录音，vad 状态还保持vad on状态，新的vad start无法起来的问题
+#if (NN_VAD_VALID_CHECK_MODE == 2)
+    ciss_set(CI_SS_VOX_VAD_CHECK,CI_SS_NN_VAD_IDLDE);
+#endif
     #if AUDIO_DATA_UPLOAD_BY_UART
     cias_aiot_param_refresh();
 
@@ -207,7 +214,7 @@ void cias_aiot_vad_start_handle(int cmd)
     ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_ON);
 #if AUDIO_DATA_UPLOAD_BY_UART
     wakeup_pcm_frame_len = xStreamBufferBytesAvailable(gCiasAiotRunParam.pcm_compress_stream_buffer) / PCM_ALG_FRAME_LEN;
-    rollback_pcm_frame_len = (wakeup_pcm_frame_len >= PCM_ALG_ROOLBACK_FRAME_LEN) ? (wakeup_pcm_frame_len - PCM_ALG_ROOLBACK_FRAME_LEN) : 0;
+    rollback_pcm_frame_len = (wakeup_pcm_frame_len >= NN_VAD_BACK_PORCH) ? (wakeup_pcm_frame_len - NN_VAD_BACK_PORCH) : 0;
     mprintf("rollback_pcm_frame_len = %d\r\n", rollback_pcm_frame_len);
     for (int i = 0; i < rollback_pcm_frame_len; i++)
     {
@@ -246,10 +253,12 @@ void cias_aiot_vad_end_handle(int type)
     gCiasAiotRunParam.stop_collect_pcm_flag = true;
     if (!type) // 强制更新参数，直接返回
     {
-#if CLOUD_ANS_TIME_OUT_ENEABLE
+#if (NN_VAD_VALID_CHECK_MODE != 2)
+#if CLOUD_ANS_TIME_OUT_ENEABLE 
         xTimerStart(gCiasAiotRunParam.cloud_ans_count_timer, 0); // 开始计时
 #endif
         gCiasAiotRunParam.cloud_parse_is_busy_flag = true;
+#endif
     }
     else
     {
@@ -320,6 +329,24 @@ void cias_aiot_vad_end_handle(int type)
     {
         gCiasAiotRunParam.customer_vad_end_callback();
     }
+#if (NN_VAD_VALID_CHECK_MODE == 2)
+    uint8_t valid_rlt = 0;
+    valid_rlt = ciss_get(CI_SS_VOX_VAD_CHECK);
+    cias_send_cmd_and_data(VAD_VAILD_CHECK_RESULT,&valid_rlt,1, DEF_FILL);
+    ciss_set(CI_SS_VOX_VAD_CHECK,CI_SS_NN_VAD_IDLDE);
+    if (!gCiasAiotFuncParam.interaction_multi_round && CI_SS_NN_VAD_VALID != valid_rlt) // 单轮交互
+    {
+        gCiasAiotRunParam.is_wake_up_flag = true;
+    }
+    if (!type && CI_SS_NN_VAD_VALID == valid_rlt) // 强制更新参数，直接返回
+    {
+#if CLOUD_ANS_TIME_OUT_ENEABLE 
+        xTimerStart(gCiasAiotRunParam.cloud_ans_count_timer, 0); // 开始计时
+#endif
+        gCiasAiotRunParam.cloud_parse_is_busy_flag = true;
+    }
+
+#endif
 #endif
     
 }
@@ -343,6 +370,19 @@ void vad_state_handle_task(void *p_arg)
             continue;
         }
 #endif
+#if AUTO_GET_AEC_GAIN
+        if (gCiasAiotFuncParam.aec_gain_get_state != GET_AEC_GAIN_IDLE)
+        {
+            vTaskDelay(pdMS_TO_TICKS(5));
+            continue;
+        }
+#endif
+        if(!ciss_get(CI_SS_VOX_WORK_STATE))
+        {
+            vTaskDelay(pdMS_TO_TICKS(5));
+            continue;
+        }
+
         if (gCiasAiotRunParam.key_is_busy_flag) // 按键处理中
         {
             vTaskDelay(pdMS_TO_TICKS(5));
@@ -413,27 +453,6 @@ void vad_state_handle_task(void *p_arg)
                 }
             }
         }
-        
-#if 0
-        if (!gCiasAiotRunParam.is_vad_force_on_flag) // 强制录音不用检测vad end
-        {
-            if ((CI_SS_VAD_START == ciss_get(CI_SS_VOX_VAD_STATE)) || (CI_SS_VAD_ON == ciss_get(CI_SS_VOX_VAD_STATE)) ||
-                (1 == ciss_get(CI_SS_VOX_VAD_FORCE_END))) // 超时机制检测
-            {
-                if (gCiasAiotRunParam.vad_start_pcm_frame_count >= gCiasAiotFuncParam.vad_start_max_timeout * 1000 / 16)
-                {
-                    gCiasAiotRunParam.is_vad_on_flag = false;
-                    mprintf("\r\n-----force vad end-----\r\n");
-                    // short vad_end_tag = -28000;
-                    // voice_data_packet_and_send(PCM_MIDDLE, &vad_end_tag, 2);
-                    //ciss_set(CI_SS_VOX_VAD_CLEAR, 1);
-                    ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_IDLE);
-                    ciss_set(CI_SS_VOX_VAD_FORCE_END, 0);
-                    cias_aiot_vad_end_handle(0x0);
-                }
-            }
-        }
-#endif
         vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
@@ -557,7 +576,7 @@ void speex_encode_task(void)
                         gCiasAiotRunParam.speex_compress_is_busy = false;
                         // mprintf("gCiasAiotFuncParam.vad_end_mute_frame = %d\r\n", gCiasAiotFuncParam.vad_end_mute_frame);
                         uint16_t upload_queue_len = PCM_UPLOAD_QUEUE_NUM - uxQueueSpacesAvailable(gCiasAiotRunParam.pcm_upload_queue);
-                        if (upload_queue_len * 2 >= (50 + gCiasAiotFuncParam.vad_filter_frame)) // 过滤500ms+过滤帧长数据
+                        // if (upload_queue_len * 2 >= (50 + gCiasAiotFuncParam.vad_filter_frame)) // 过滤500ms+过滤帧长数据
                         {
                             gCiasAiotRunParam.upload_pcm_to_wifi_flag = true;
                         }
@@ -605,7 +624,7 @@ bool audio_speex_task_init(void)
         return pdFALSE;
     }
     ci_speex_hander->ci_speex_mode = CI_SPEEX_INT;
-    xTaskCreate(speex_encode_task, "speex_encode_task", 1024+256, NULL, 4, NULL);
+    xTaskCreate(speex_encode_task, "speex_encode_task", 1024, NULL, 4, NULL);
 
     return pdTRUE;
 }
@@ -670,7 +689,7 @@ void opus_encode_task(void)
                     // mprintf("opus encode_len len = %d\r\n", encode_len);
                     //  mprintf("gCiasAiotFuncParam.vad_end_mute_frame = %d\r\n", gCiasAiotFuncParam.vad_end_mute_frame);
                     uint16_t upload_queue_len = PCM_UPLOAD_QUEUE_NUM - uxQueueSpacesAvailable(gCiasAiotRunParam.pcm_upload_queue); //
-                    if (upload_queue_len * 4 >= (50 + gCiasAiotFuncParam.vad_filter_frame))                                        // 过滤500ms+过滤帧长数据
+                    // if (upload_queue_len * 4 >= (50 + gCiasAiotFuncParam.vad_filter_frame))                                        // 过滤500ms+过滤帧长数据
                     {
                         gCiasAiotRunParam.upload_pcm_to_wifi_flag = true;
                     }
@@ -744,7 +763,7 @@ void g722_encode_task(void)
                    // mprintf("encode_len = %d\r\n", encode_len);
                     // mprintf("gCiasAiotFuncParam.vad_end_mute_frame = %d\r\n", gCiasAiotFuncParam.vad_end_mute_frame);
                     uint16_t upload_queue_len = PCM_UPLOAD_QUEUE_NUM - uxQueueSpacesAvailable(gCiasAiotRunParam.pcm_upload_queue);
-                    if (upload_queue_len * 2 >= (50 + gCiasAiotFuncParam.vad_filter_frame)) // 过滤500ms+过滤帧长数据
+                    // if (upload_queue_len * 2 >= (50 + gCiasAiotFuncParam.vad_filter_frame)) // 过滤500ms+过滤帧长数据
                     {
                         gCiasAiotRunParam.upload_pcm_to_wifi_flag = true;
                     }

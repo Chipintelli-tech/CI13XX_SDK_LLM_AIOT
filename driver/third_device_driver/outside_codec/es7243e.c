@@ -21,7 +21,9 @@
 
 #define LOG_7243E_DEBUG LOG_USER
 
-
+#if AUTO_GET_AEC_GAIN
+float es7243e_init_gain = 0.0f;
+#endif
 static void __delay(unsigned int cnt)
 {
     unsigned int j=0;
@@ -366,12 +368,15 @@ void es7243e_init(bool is_linein)
     memset((void*)&alc_cfg_str,0,sizeof(es7243e_alc_config_t));
     if(is_linein)
     {
-        alc_cfg_str.max_gain = 8.0f;
+        alc_cfg_str.max_gain = 14.0f;
     }
     else
     {
         alc_cfg_str.max_gain = 14.0f;
     }
+    #if AUTO_GET_AEC_GAIN
+    es7243e_init_gain = alc_cfg_str.max_gain;
+    #endif
     alc_cfg_str.alc_level = ES7243E_ALC_LEVEL__6dB;
     ES7243E_ALC_config(&alc_cfg_str);
     es7243e_alc_gate_en(ES7243E_ALC_OFF);

@@ -1,6 +1,6 @@
 /**
- * @file ci_denoise.h
- * @brief 
+ * @file vp_nn_cmpt_port_host.h
+ * @brief  
  * @version V1.0.0
  * @date 2019.07.09
  * 

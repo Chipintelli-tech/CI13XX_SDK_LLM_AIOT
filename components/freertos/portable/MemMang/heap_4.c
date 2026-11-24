@@ -138,9 +138,8 @@ void *pvPortMalloc( size_t xWantedSize )
 	// total_size += xWantedSize;
 	// mprintf("pv malloc size = %d\n",xWantedSize);
 	// mprintf("pv malloc total_size = %d\n",total_size);
-BlockLink_t *pxBlock, *pxPreviousBlock, *pxNewBlockLink;
-void *pvReturn = NULL;
-
+	BlockLink_t *pxBlock, *pxPreviousBlock, *pxNewBlockLink;
+	void *pvReturn = NULL;
 	vTaskSuspendAll();
 	#if CHECK_MALLOC_IS_OVER_WRITE
 	if(xWantedSize % 4)
@@ -270,7 +269,6 @@ void *pvReturn = NULL;
 		{
 			mtCOVERAGE_TEST_MARKER();
 		}
-
 		traceMALLOC( pvReturn, xWantedSize );
 	}
 	#if CHECK_MALLOC_IS_OVER_WRITE

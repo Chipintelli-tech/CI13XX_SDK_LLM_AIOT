@@ -100,7 +100,7 @@ int nlp_param_init(NlpParamTypedef *pNlpPram)
 int nlp_module_init(void)
 {
 
-    #if (MULT_INTENT == 1)
+#if (MULT_INTENT == 1)
     
     /*定义3.5待自然说关闭相关功能，
     A、第一个是产品关闭的词条，例如：空调关闭、风扇关闭等

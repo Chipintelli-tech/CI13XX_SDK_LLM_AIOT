@@ -182,7 +182,6 @@ int vpr_run_one_recognition()     //云端协议执行
                             100,k,asr_start_frm,asr_valid_frm);
         if(ret)
         {
-            mprintf("vp_buffer_identify[0] = %d\r\n", vp_buffer_identify[0]);
             if(vp_buffer_identify[0] > 0.5)
             {
                 mprintf("识别到女声：%d\n", (int)(vp_buffer_identify[0]*100));
@@ -244,7 +243,6 @@ int vpr_run_one_recognition()
                             100,k,asr_start_frm,asr_valid_frm);
         if(ret)
         {
-            mprintf("vp_buffer_identify[0] = %d\r\n", vp_buffer_identify[0]);
             if(vp_buffer_identify[0] > 0.5)
             {
                 mprintf("识别到女声：%d\n", (int)(vp_buffer_identify[0]*100));

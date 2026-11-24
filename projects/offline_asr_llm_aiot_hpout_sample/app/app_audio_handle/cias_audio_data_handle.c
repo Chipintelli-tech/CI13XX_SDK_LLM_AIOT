@@ -7,10 +7,8 @@
 #include "cias_network_msg_send_task.h"
 #include "semphr.h"
 #include "cias_network_msg_protocol.h"
-#include "audio_play_api.h"
 #include "codec_manager.h"
 #include "ci_assert.h"
-#include "cias_demo_config.h"
 #include "cias_common.h"
 #include "cias_voice_upload.h"
 #include "status_share.h"
@@ -620,7 +618,7 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
             }
             else if (param == 0)
             {
-               	ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE);  //更新播放空闲
+               	ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE);  //更新播放空闲
             }
             else
             {

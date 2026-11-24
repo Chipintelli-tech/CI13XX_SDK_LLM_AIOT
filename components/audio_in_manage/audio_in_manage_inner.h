@@ -34,10 +34,7 @@ typedef struct
 void audio_in_manage_inner_task(void* p);
 
 void set_get_fft_rslt_fun_callback(get_fft_rslt_fun_t fun);
-
-void get_ci_ai_doa_model_addr(void);
-void get_ci_ai_denoise_model_addr(void);
-void get_ci_tts_model_addr(void);
+uint32_t get_ci_nn_denoise_model_addr(void);
 #ifdef __cplusplus
 }
 #endif

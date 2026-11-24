@@ -7,8 +7,6 @@
 #include "ci130x_uart.h"
 #include "sdk_default_config.h"
 
-
-
 void _delay_10us_240M(uint32_t cnt)
 {
     volatile uint32_t i,j = 0;

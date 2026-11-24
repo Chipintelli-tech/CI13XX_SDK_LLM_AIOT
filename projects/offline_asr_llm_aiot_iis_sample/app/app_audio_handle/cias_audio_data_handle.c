@@ -9,7 +9,6 @@
 #include "cias_network_msg_protocol.h"
 #include "codec_manager.h"
 #include "ci_assert.h"
-#include "cias_demo_config.h"
 #include "cias_common.h"
 #include "cias_voice_upload.h"
 #include "status_share.h"
@@ -164,14 +163,6 @@ void pcm_data_play_task(void)
             int16_t *pcm_data_p_cpy = (int16_t *)write_pcm_addr_cpy;
             for (int i = 0; i < num; i++)
             {
-        #if USE_DENOISE_NN_RTC
-                if (is_convert_left_right)
-                {
-                    pcm_data_p_cpy[2 * i] = data_p[2 * i];
-                    pcm_data_p_cpy[2 * i + 1] = data_p[i];
-                }
-                else
-        #endif
                 {
                     pcm_data_p_cpy[2 * i] = data_p[2 * i];
                     pcm_data_p_cpy[2 * i + 1] = data_p[2 * i + 1];
@@ -195,7 +186,7 @@ void pcm_data_play_task(void)
         if(send_data_flag && !gCiasAiotRunParam.iis_play_start_flag)
         {
             send_data_flag = false;
-            ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE);  //更新空闲状态
+            ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE);  //更新空闲状态
             cm_set_codec_mute(PLAY_CODEC_ID, CODEC_OUTPUT, 3, ENABLE);
             cm_stop_codec(PLAY_CODEC_ID, CODEC_OUTPUT);
         }
@@ -699,7 +690,7 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
             }
             else if (param == 0)
             {
-               	ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE);  //更新播放空闲
+               	ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE);  //更新播放空闲
             }
             else
             {
@@ -1010,7 +1001,7 @@ bool cias_online_func_init(void)
         return false;
     }
 #endif
-#if !IF_USE_ANOTHER_CODEC_TO_GET_REF && AUDIO_DATA_PLAY_BY_IIS
+#if AUDIO_DATA_PLAY_BY_IIS
     if (!xTaskCreate(pcm_data_play_task, "pcm_data_play_task", 512, NULL, 4, NULL)) // pcm播放任务
     {
         mprintf("error %s  %d\n", __func__, __LINE__);

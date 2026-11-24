@@ -275,17 +275,7 @@ void network_send_data_task(void *p_arg)
                     }
                     else
                     {
-                    //    mprintf("data->length = %d\r\n", data->length);
-                    //    uint8_t *p = (int8_t *)data->payload;
-                    //    for(int i = 0; i < data->length; i++)
-                    //    {
-                    //         mprintf("%02x", (uint8_t)p[i]);
-                    //    }
-                       #if AUDIO_SEND_WITH_PROTOCOL_HEADER
                        ret = network_send((int8_t *)data->payload, data->length);  
-                       #else
-                       ret = network_send((int8_t *)data->payload + 16, data->length - 16);   
-                       #endif   
                     }
                     break;
                 } 

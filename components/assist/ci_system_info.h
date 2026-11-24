@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#if CONFIG_DEBUG_EN
+#if CONFIG_DEBUG_EN && !SDK_RELEASE_EN
 #define PRINT_MEM_STATUS()     get_mem_status()
 #define PRINT_FMEM_STATUS()    get_fmem_status()
 #define PRINT_TASK_STATUS()    get_task_status()
@@ -26,7 +26,6 @@ extern "C"
 #define PRINT_FMEM_STATUS()    do{}while(0)
 #define PRINT_TASK_STATUS()    do{}while(0)
 #endif
-
 /**
  * @ingroup assist
  * @defgroup system_info 系统状态查询

@@ -17,13 +17,13 @@
 #if USE_SED
 
 #if USE_SED_CRY
-const sed_param_config_t sed_config_para = 
+const sed_param_config_t g_sed_config_para = 
 {
 	.threshold = THRESHOLD_CRY,
 	.times = TIMES_CRY
 };
 #elif USE_SED_SNORE
-const sed_param_config_t sed_config_para = 
+const sed_param_config_t g_sed_config_para = 
 {
 	.threshold = THRESHOLD_SNORE,
 	.times = TIMES_SNORE
@@ -39,11 +39,11 @@ static bool sed_relt_flag = false;
 
 bool sed_continuous_detect(float out_array)
 {  
-    float thr = sed_config_para.threshold;
+    float thr = g_sed_config_para.threshold;
 #if USE_SED_CRY
-    if(sed_config_para.times <= TIMES_CRY)
+    if(g_sed_config_para.times <= TIMES_CRY)
 #elif USE_SED_SNORE
-    if(sed_config_para.times <= TIMES_SNORE)
+    if(g_sed_config_para.times <= TIMES_SNORE)
 #endif
     {
         times ++ ;
@@ -55,7 +55,7 @@ bool sed_continuous_detect(float out_array)
         {
             out_flag--;
         }
-        if(times == sed_config_para.times )
+        if(times == g_sed_config_para.times )
         {
             if (out_flag > 0)
             {

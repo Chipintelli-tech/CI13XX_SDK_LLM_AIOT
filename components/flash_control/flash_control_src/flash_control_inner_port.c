@@ -22,7 +22,7 @@ int32_t flash_control_inner_serve_cb(void *payload, uint32_t payload_len, uint32
 {
     // if(payload_len > sizeof(flash_control_inner_msg_buf))
     {
-        // mprintf("payload_len = %d\n",payload_len);
+        // ci_logdebug(LOG_SYS_INFO, "payload_len = %d\n",payload_len);
         // FCI_CI_ASSERT(0,"\n");
     }
     // MASK_ROM_LIB_FUNC->newlibcfunc.memcpy_p((void*)flash_control_inner_msg_buf,(void*)payload,payload_len);
@@ -51,7 +51,7 @@ int32_t flash_control_inner_serve_cb(void *payload, uint32_t payload_len, uint32
             #if CHECK_PARA_NUM
             if(20 != payload_len)
             {
-                mprintf("payload_len = %d\n",payload_len);
+                ci_logdebug(LOG_SYS_INFO, "payload_len = %d\n",payload_len);
                 FCI_CI_ASSERT(0,"\n");
             }
             #endif
@@ -68,7 +68,7 @@ int32_t flash_control_inner_serve_cb(void *payload, uint32_t payload_len, uint32
             #if CHECK_PARA_NUM
             if(8 != payload_len)
             {
-                mprintf("payload_len = %d\n",payload_len);
+                ci_logdebug(LOG_SYS_INFO, "payload_len = %d\n",payload_len);
                 FCI_CI_ASSERT(0,"\n");
             }
             #endif

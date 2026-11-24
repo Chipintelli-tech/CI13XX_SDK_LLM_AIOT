@@ -96,7 +96,7 @@ out:
 //处理串口消息
 void userapp_deal_com_msg_ex(sys_msg_com_data_t *com_msg)
 {
-#if USE_IR_ENABEL
+#if USE_IR_ENABLE
     uint32_t u32id = 0;
     uint8_t u8id_type = 0;
     u32id = *((uint32_t *)(&com_msg->msg_data[2]));

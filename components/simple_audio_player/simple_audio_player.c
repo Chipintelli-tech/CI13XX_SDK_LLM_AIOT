@@ -420,7 +420,7 @@ static int sap_start_play_inner(sap_msg_t *msg)
     // {
     //     vPortFree(tmp_buf);
     // }
-    ci_loginfo(LOG_AUDIO_PLAY, "Play start\r\n");
+    mprintf("Play start\r\n");
     return ret;
 }
 
@@ -451,7 +451,7 @@ static int sap_decode_one_frame(void)
 #endif
     while (1)
     {
-        // mprintf("source_buf_bytes_left = %d\r\n", sap_info.source_buf_bytes_left);
+        //ci_logwarn(LOG_AUDIO_PLAY, "sap source_buf_bytes_left %d\n", sap_info.source_buf_bytes_left);
         read_size = SAP_SOURCE_DATA_BUF_SIZE - sap_info.source_buf_bytes_left;
         if (read_size > 0)
         {
@@ -466,7 +466,7 @@ static int sap_decode_one_frame(void)
             //     vTaskDelay(50);
             //     wait_flag = false;
             // }
-            // ci_logwarn(LOG_AUDIO_PLAY, "sap read %d bytes\n", read_size);
+           // ci_logwarn(LOG_AUDIO_PLAY, "sap read %d\n", read_size);
 
 #if MP3_NO_CONSTANT_BITRATE
             if(src_type == SAP_DATA_SRC_STREAM)//本地为恒定比特率不需要计算
@@ -573,7 +573,7 @@ static int sap_decode_one_frame(void)
 
     cm_get_pcm_buffer(PLAY_CODEC_ID, &pcm_buf, portMAX_DELAY);
     int32_t err = sap_info.cur_decoder->decode_one_frame(sap_info.decoder_handle, &sap_info.source_data_buf[sap_info.source_buf_offset], &bytes_left, (void *)pcm_buf, 0); // Decode a frame.
-    //ci_logwarn(LOG_AUDIO_PLAY, "audio decorde err %d,bytes_left %d\n", err, bytes_left);
+   // ci_logwarn(LOG_AUDIO_PLAY, "audio decorde err %d,bytes_left %d\n", err, bytes_left);
     #if NET_AUDIO_PLAY_BY_MP3
     #if !MP3_NO_CONSTANT_BITRATE
     //恒定比特率直接赋值解码的大小
@@ -608,13 +608,9 @@ static int sap_decode_one_frame(void)
     }
     else
     {
-
         cm_release_pcm_buffer(PLAY_CODEC_ID, CODEC_OUTPUT, (void *)pcm_buf);
         wait_codec_play_finish();
-        /*
-        if (err != ERR_MP3_MAINDATA_UNDERFLOW)
-            ci_logwarn(LOG_AUDIO_PLAY, "audio decode err %d,bad frame!\n", err);
-        */
+        //ci_logwarn(LOG_AUDIO_PLAY, "audio decode err %d,bad frame!\n", err);
     }
     return ret;
 }
@@ -633,6 +629,7 @@ static int sap_stop_play_inner(int32_t play_cb_state)
         vPortFree(sap_info.pcm_buffer);
         sap_info.pcm_buffer = NULL;
     }
+    pdf_deinit();
     #if NET_AUDIO_PLAY_BY_MP3
     sap_info.mp3_one_frame_size = 0;
     #endif
@@ -640,8 +637,11 @@ static int sap_stop_play_inner(int32_t play_cb_state)
     {
         cias_send_cmd(LOCAL_AUDIO_PLAY_STOP, DEF_FILL);
     }
-	if(!check_combination_index_state())
-    ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE);
+
+    if(CI_SS_PLAY_STATE_PLAYING == ciss_get(CI_SS_PLAY_STATE) && !check_combination_index_state())
+    {
+        ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE); // 设置播放结束
+    }
     ci_loginfo(LOG_AUDIO_PLAY, "Play end play_cb_state =%d\r\n", play_cb_state);
     if (sap_info.play_end_callback)
     {
@@ -679,7 +679,6 @@ static void task_simple_audio_player(void *pvParameters)
                 // stop last play.
                 sap_info.state = SAP_STATE_STOPPING;
                 sap_stop_play_inner(-1);
-                pdf_deinit();
                 // mprintf("SAP_STATE_IDLE2\r\n");
                 sap_info.state = SAP_STATE_IDLE;
                 audio_play_state = AUDIO_PLAY_STATE_IDLE;
@@ -696,7 +695,6 @@ static void task_simple_audio_player(void *pvParameters)
                     // ci_logerr(LOG_AUDIO_PLAY, "start play failed,err %d!\n", rst);
                     sap_info.state = SAP_STATE_STOPPING;
                     sap_stop_play_inner(-1);
-                    pdf_deinit();
                     sap_info.state = SAP_STATE_IDLE;
                     audio_play_state = AUDIO_PLAY_STATE_IDLE;
                     wait_time = portMAX_DELAY;

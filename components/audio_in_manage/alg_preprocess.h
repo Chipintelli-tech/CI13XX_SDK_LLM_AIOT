@@ -7,12 +7,10 @@
   ******************************************************************************
   */
 
-#ifndef ALG_PREPROCESS_H
-#define ALG_PREPROCESS_H
+#ifndef __ALG_PREPROCESS_H__
+#define __ALG_PREPROCESS_H__
 
 #include <stdbool.h>
-
-
 
 typedef enum
 {
@@ -27,7 +25,7 @@ typedef struct
 {
   bool alg_enable;
   bool iis_out_enable;                   //是否通过iis输出16k音频信号。
-  bool uart_out_enable;                 //是否通过uart输出16K音频信号
+  bool uart_out_enable;                  //是否通过uart输出16K音频信号
   audio_channel_model iis_left_channel;  //左通道输出音频。
   audio_channel_model iis_right_channel; //右通道输出音频。
   bool vad_mark_enable;                  //是否附带vad标签，默认左通道输出vad标签。
@@ -39,8 +37,8 @@ typedef struct
   int frame_length;    //输入的数据帧长
   int mic_channel_num; //mic：麦克风信号的通道数
   int ref_channel_num; //ref：参考信号的通道数
-//   short *mic_data;     //麦克风信号的数据地址
-//   short *ref_data;     //参考信号的数据地址
+  //   short *mic_data;     //麦克风信号的数据地址
+  //   short *ref_data;     //参考信号的数据地址
   //mic_model_enum mic_model;
 } audio_capture_t;
 
@@ -49,6 +47,7 @@ typedef int (*func_process_t)(void *, void *);
 
 typedef struct
 {
+  bool alg_en;                 //算法功能使能
   func_init_t func_init;       //ssp模块初始化函数
   func_process_t func_process; //ssp模块运行函数
   void *module_config;         //ssp模块配置参数结构体地址
@@ -58,42 +57,42 @@ typedef struct
 //ssp_模块注册
 typedef struct
 {
-    audio_capture_t* audio_capture;
-	ci_ssp_st* ci_ssp;
-	int module_num;                //ssp模块句柄
+  audio_capture_t *audio_capture;
+  ci_ssp_st *ci_ssp;
+  int module_num; //ssp模块句柄
 } ci_ssp_registe_t;
 
-typedef struct ci_ssp_config_st {
-	//ci_ssp_st hpf;
-    ci_ssp_st alc_auto_switch;	       	//alc_动态alc
-    ci_ssp_st stft;					    //fft
-    ci_ssp_st aec;					    //AEC
-    ci_ssp_st doa;					    //DOA
-    ci_ssp_st dereverb;				    //DEREVERB
-    ci_ssp_st bf;
-    ci_ssp_st ai_denoise;               //ai_denoise
-    ci_ssp_st denoise;				    //DENOISE
-    ci_ssp_st istft;				    //ifft
-    ci_ssp_st vox;
-    ci_ssp_st eq;
-    ci_ssp_st drc;
- 	ci_ssp_st iis_out_audio;		    //音频输出模块
-    ci_ssp_st sed; 
-    ci_ssp_st pwk;                     //就近唤醒模块
-}ci_ssp_config_t;
-
+//前端算法处理顺序以该结构体成员顺序为准
+typedef struct ci_ssp_config_st
+{
+  ci_ssp_st alc_auto_switch; //动态alc
+  ci_ssp_st nn_noise_est;		 //噪声估计
+  ci_ssp_st stft;            //FFT
+  ci_ssp_st doa;             //DOA
+  ci_ssp_st aec;             //AEC
+  ci_ssp_st dereverb;        //DEREVERB
+  ci_ssp_st bf;
+  ci_ssp_st nn_denoise;      //NN降噪
+  ci_ssp_st tra_denoise;     //传统降噪
+  ci_ssp_st istft;           //IFFT
+  ci_ssp_st eq;
+  ci_ssp_st drc;
+  ci_ssp_st nn_vad;          //nn_vad参数
+  ci_ssp_st iis_out_audio;   //音频输出模块
+  ci_ssp_st sed;
+  ci_ssp_st pwk;             //就近唤醒模块
+} ci_ssp_config_t;
 
 typedef enum
 {
-    ci_ssp_alc_auto_switch = 0,
-    ci_ssp_aec,
-    ci_ssp_doa,
-    ci_ssp_dr,
-    ci_ssp_bf,
-    ci_ssp_denoise,
-    ci_ssp_max,
-}ci_ssp_alg_switch_t;
-
+  ci_ssp_alc_auto_switch = 0,
+  ci_ssp_aec,
+  ci_ssp_doa,
+  ci_ssp_dr,
+  ci_ssp_bf,
+  ci_ssp_denoise,
+  ci_ssp_max,
+} ci_ssp_alg_switch_t;
 
 #ifdef __cplusplus
 extern "C"
@@ -138,7 +137,7 @@ extern "C"
  * @param wrapfft_audio_t 音频处理数据流句柄.
  * @return denoise模块句柄.
  */
-  void *ci_denoise_module_init(void *module_config, void *wrapfft_audio_t);
+  void *ci_tra_denoise_module_init(void *module_config, void *wrapfft_audio_t);
   /**
  * @brief denoise模块执行.
  * 
@@ -146,7 +145,7 @@ extern "C"
  * @param wrapfft_audio_t 音频处理数据流句柄.
  * @return 返回运行状态.
  */
-  int ci_denoise_processing(void *handle, void *wrapfft_audio_t);
+  int ci_tra_denoise_processing(void *handle, void *wrapfft_audio_t);
 
   /**
 * @brief aec模块初始化.
@@ -155,7 +154,7 @@ extern "C"
 * @param wrapfft_audio_t 音频处理数据流句柄.
 * @return aec模块句柄.
 */
-  void* ci_bf_module_init(void* module_config, void* wrapfft_audio_t);
+  void *ci_bf_module_init(void *module_config, void *wrapfft_audio_t);
   /**
  * @brief beamforming模块初始化.
  * 
@@ -164,7 +163,7 @@ extern "C"
  * @return beamforming模块句柄.
  */
 
-  int ci_bf_processing(void *handle, void* wrapfft_audio_t);
+  int ci_bf_processing(void *handle, void *wrapfft_audio_t);
   /**
  * @brief beamforming模块执行.
  * 
@@ -172,15 +171,13 @@ extern "C"
  * @param wrapfft_audio_t 音频处理数据流句柄.
  * @return 返回运行状态.
  */
-  void* ci_dereverb_module_init(void* module_config, void* wrapfft_audio_t);
-  int ci_dereverb_processing(void* handle, void* wrapfft_audio_t);
+  void *ci_dereverb_module_init(void *module_config, void *wrapfft_audio_t);
+  int ci_dereverb_processing(void *handle, void *wrapfft_audio_t);
 
-  int ci_doa_processing(void* handle, void* wrapfft_audio_t);
+  void *ci_doa_module_init(void *module_config, void *wrapfft_audio_t);
+  int ci_doa_processing(void *handle, void *wrapfft_audio_t);
 
-  void *ci_ai_doa_module_init(void *module_config, void *wrapfft_audio_t);
-  int ci_ai_doa_processing(void* handle, void* wrapfft_audio_t);
-
-  void* ci_aec_module_init(void* handle, void* wrapfft_audio_t);
+  void *ci_aec_module_init(void *handle, void *wrapfft_audio_t);
   /**
 * @brief aec模块执行.
 *
@@ -188,10 +185,10 @@ extern "C"
 * @param wrapfft_audio_t 音频处理数据流句柄.
 * @return 返回运行状态.
 */
-  int ci_aec_processing(void* handle, void* wrapfft_audio_t);
-  
-  void* ci_sed_module_init(void* module_config, void* wrapfft_audio_t);
-  int ci_sed_processing(void* handle, void* wrapfft_audio_t);
+  int ci_aec_processing(void *handle, void *wrapfft_audio_t);
+
+  void *ci_sed_module_init(void *module_config, void *wrapfft_audio_t);
+  int ci_sed_processing(void *handle, void *wrapfft_audio_t);
 
   /**
  * @brief 语音前端信号处理ssp模块初始化.
@@ -225,8 +222,6 @@ extern "C"
  * @return 返回运行状态.
  */
 
-
-// int ci_asr_fe_processing(short *src_data, int frame_length);
   /**
  * @brief iis_out_audio模块初始化.
  * 
@@ -247,22 +242,18 @@ extern "C"
   void *ci_alc_auto_switch_module_init(void *module_config, void *wrapfft_audio_t);
 
   int ci_alc_auto_switch_processing(void *handle, void *wrapfft_audio_t);
-  void set_ssp_registe(audio_capture_t* audio_capture, ci_ssp_st* ci_ssp, int module_num);
-  
-  void *ci_ai_denoise_module_init(void *module_config, void *wrapfft_audio_t);
-  int ci_ai_denoise_processing(void *handle, void *wrapfft_audio_t);
 
-  void *ci_drc_module_init(void *module_config, void *wrapfft_audio_t);
-  int ci_drc_processing(void *handle, void *wrapfft_audio_t);
+  void * ci_nn_noise_est_init(void *module_config, void *wrapfft_audio_t);
+  void * ci_nn_noise_est_processing(void *handle, void *wrapfft_audio_t);
 
-  void *ci_eq_module_init(void *module_config, void *wrapfft_audio_t);
-  int ci_eq_processing(void *handle, void *wrapfft_audio_t);
+  void set_ssp_registe(audio_capture_t *audio_capture, ci_ssp_st *ci_ssp, int module_num);
 
-  void *ci_vox_module_init(void *module_config, void *wrapfft_audio_t);
-  int ci_vox_processing(void *handle, void *wrapfft_audio_t);
-  short ci_get_vad_result(void);
+  void *ci_nn_denoise_module_init(void *module_config, void *wrapfft_audio_t);
+  int ci_nn_denoise_processing(void *handle, void *wrapfft_audio_t);
+
+  void ci_nn_vad_module_init(void *module_config, void *wrapfft_audio_t);
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* ALG_PREPROCESS_H */
+#endif /* __ALG_PREPROCESS_H__ */

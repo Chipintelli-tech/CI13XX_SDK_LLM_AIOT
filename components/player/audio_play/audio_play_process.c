@@ -71,18 +71,13 @@
 /**************************************************************************
                      define
 ****************************************************************************/
-#define READBUF_SIZE (576U)
+#define READBUF_SIZE            (576U) 
+#define MAX_OUTPUTBUFF_SIZE     (1152U)
+#define MIN_OUTPUTBUFF_SIZE     (576U)
+#define PCM_BUF_COUNT           (4)
+#define MIN_VALID_DATA_SIZE     (20U)
+#define TIMEOUT_CNT             (40000)
 
-#if ON_LINE_SUPPORT
-#define MAX_OUTPUTBUFF_SIZE (4608U)
-#else
-#define MAX_OUTPUTBUFF_SIZE (1152U)
-#endif
-
-#define MIN_OUTPUTBUFF_SIZE (576U)
-#define PCM_BUF_COUNT (4)
-#define MIN_VALID_DATA_SIZE (20U)
-#define TIMEOUT_CNT (40000)
 
 enum
 {
@@ -717,9 +712,6 @@ static int32_t audio_play_decode_continue(void)
                     if (last_pcm_buffer == NULL)
                     {
                         last_pcm_buffer = pvPortMalloc(pcm_buffer_total_size);
-#if USE_SOFT_AEC_REF
-                        set_play_buffer_info(last_pcm_buffer, (last_pcm_buffer + pcm_buffer_total_size));
-#endif
                         CI_ASSERT(last_pcm_buffer, "\n");
                     }
                     pcm_buffer_info.play_buffer_info.pcm_buffer = last_pcm_buffer;
@@ -1009,6 +1001,7 @@ static void audio_play_playing_deal(uint32_t uxBits)
             ci_logdebug(LOG_AUDIO_PLAY, "audio play done\n");
             play_end_cb_flag = AUDIO_PLAY_CB_STATE_DONE;
             audio_play_state = AUDIO_PLAY_STATE_STOP;
+            if(!check_combination_index_state())
             ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE);
             return;
         }
@@ -1930,7 +1923,6 @@ void task_audio_play(void *pvParameters)
 
             gCiasAiotRunParam.mp3_play_finish_flag = false;
             ci_logdebug(LOG_AUDIO_PLAY, "play type %d\n", play_msg.play_data_type);
-
             audio_play_state = AUDIO_PLAY_STATE_START;
             ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING);
             #if (PLAYER_CONTROL_PA)
@@ -2173,12 +2165,6 @@ void task_audio_play(void *pvParameters)
             audio_play_hw_stop(play_msg.audio_device_arg.pa_cmd);
             audio_play_state = AUDIO_PLAY_STATE_IDLE;
             ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE);
-            #if AUDIO_VAD_CHECK_ENABLE
-            if (!gCiasAiotFuncParam.upload_play_full_duplex)
-            {
-                ciss_set(CI_SS_VOX_WORK_STATE, 1);
-            }
-            #endif
             ci_loginfo(LOG_AUDIO_PLAY, "play end\n");
             mprintf("ciss_get(CI_SS_PLAY_STATE) = %d\r\n", ciss_get(CI_SS_PLAY_STATE));
             #if (PLAYER_CONTROL_PA)
@@ -2236,10 +2222,9 @@ void task_audio_play(void *pvParameters)
             /* 清理sonic_stream内部数据 */
             sonicCleanStream(sonic_stream);
 #endif
-
             audio_play_state = AUDIO_PLAY_STATE_IDLE;
+                if(!check_combination_index_state())
             ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE);
-
 #if AUDIO_PLAY_USE_DYNAMIC_DECODER_MEM
             if (curr_decoder_ops->destroy != NULL)
             {
@@ -2255,12 +2240,6 @@ void task_audio_play(void *pvParameters)
                 }
                 play_will_finish = true;
             }
-            #if AUDIO_VAD_CHECK_ENABLE
-            if (!gCiasAiotFuncParam.upload_play_full_duplex)
-            {
-                ciss_set(CI_SS_VOX_WORK_STATE, 1);
-            }
-            #endif
             ci_loginfo(LOG_AUDIO_PLAY, "play end1\n");
             mprintf("ciss_get(CI_SS_PLAY_STATE) = %d\r\n", ciss_get(CI_SS_PLAY_STATE));
             // #if (PLAYER_CONTROL_PA)

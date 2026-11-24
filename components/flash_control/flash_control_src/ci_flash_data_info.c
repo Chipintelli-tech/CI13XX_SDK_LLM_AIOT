@@ -273,6 +273,7 @@ uint32_t ci_flash_data_info_init(uint8_t default_model_group_id)
         vTaskDelay(pdMS_TO_TICKS(2));
     }
 
+
     uint32_t ret = 1;
 
     //读取分区信息表
@@ -325,7 +326,7 @@ uint32_t ci_flash_data_info_init(uint8_t default_model_group_id)
     cinv_init(partition_table.nv_data_offset, partition_table.nv_data_size);
     ci_loginfo(LOG_NVDATA,"nv_data_offset = %08x\n",partition_table.nv_data_offset);
     ci_loginfo(LOG_NVDATA,"nv_data_size = %08x\n",partition_table.nv_data_size);
-    ci_loginfo(LOG_NVDATA,"FWV:%s_V%x.%x.%x\n",
+    ci_loginfo(LOG_NVDATA,"FWV:%s_V%d.%d.%d\n",
         partition_table.soft_ware_name, 
         (partition_table.soft_ware_version>>16)&0xff,
         (partition_table.soft_ware_version>>8)&0xff,

@@ -459,6 +459,10 @@ typedef struct
     volatile uint32_t R_ATK_DCY_STATUS; /*0x48*/
 
     volatile uint32_t PAUSE_STATUS;     /*0x4c*/
+    volatile uint32_t reg50;            /*0x50, gain_l*/
+    volatile uint32_t reg51;            /*0x51, gain_r*/
+    volatile uint32_t reg52;            /*0x52, 第0Bit gain_l_load*/
+    volatile uint32_t reg53;            /*0x53, 第0Bit gain_r_load*/
 }ALC_TypeDef;
 
 #define HAL_NPU_BASE    (0xECC644)

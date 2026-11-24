@@ -15,11 +15,6 @@ extern void RC_BNPU_CALLER(sed_rslt_cb)(void* para);
 extern void RC_BNPU_CALLER(flash_get_en_data)(uint32_t scr_addr,uint8_t* data_in,uint32_t size);
 extern void RC_BNPU_CALLER(alg_aes_type_tip)(int type);
 extern void RC_BNPU_CALLER(alg_aes_addr)(uint8_t* data_in);
-extern int RC_HOST_CALLER(get_pingyin_word)(char* split_word,int i,uint16_t* yinsu_id_list);
-extern int RC_HOST_CALLER(get_data_in)(uint32_t scr_addr,float* data_in,uint32_t size);
-extern int RC_HOST_CALLER(get_dqt_bias)(uint32_t scr_addr,int8_t * w, float* dqt, float* bias);
-extern int RC_HOST_CALLER(set_tts_dnn_done)(uint32_t type);
-extern int RC_HOST_CALLER(set_tts_init_done)(uint32_t type);
 #endif
 #endif
 

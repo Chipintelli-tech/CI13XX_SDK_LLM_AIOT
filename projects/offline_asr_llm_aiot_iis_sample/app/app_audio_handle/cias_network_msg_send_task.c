@@ -65,7 +65,6 @@ int32_t broadlink_frame_create(uint32_t type, const uint8_t *input, uint32_t len
 {
     cias_standard_head_t *head = (cias_standard_head_t *)output;
     static uint16_t index_packg = 0;
-#if AUDIO_SEND_WITH_PROTOCOL_HEADER
     /* Check param */
     if (output == NULL || len + sizeof(cias_standard_head_t) > maxsize)
     {
@@ -94,10 +93,6 @@ int32_t broadlink_frame_create(uint32_t type, const uint8_t *input, uint32_t len
     /* Fill data part */
     memcpy(output + sizeof(cias_standard_head_t), input, len);
     return head->len + sizeof(cias_standard_head_t);
-#else
-    memcpy(output, input, len);
-    return head->len;
-#endif
 }
 
 
@@ -108,9 +103,6 @@ int cais_send_msg_flag_to_network(int8_t *send_buffer)
 
 int32_t cias_send_cmd(uint32_t cmd, uint32_t fill_data)
 {
-#if !AUDIO_SEND_WITH_PROTOCOL_HEADER
-    return 0;
-#endif
     uint8_t send_msg_buf[16] = {0};
     sdio_task_msg_t send_msg;
     broadlink_frame_create(cmd, NULL, 0, send_msg_buf, 16, fill_data, 0);
@@ -136,9 +128,6 @@ int32_t cias_send_cmd(uint32_t cmd, uint32_t fill_data)
  */
 int32_t cias_send_cmd_and_data(uint32_t cmd_type, uint8_t *buf, int32_t len, uint32_t fill_data)
 {
-#if !AUDIO_SEND_WITH_PROTOCOL_HEADER
-    return 0;
-#endif
     static int32_t buff_count = 0;
     int32_t package_length = 0;
     sdio_task_msg_t send_msg;
@@ -185,11 +174,7 @@ int voice_data_packet_and_send(uint32_t packet_type,uint8_t *voice_data, int32_t
     send_msg.network_data.payload = (uint32_t)(broad_link_buf + buff_count * NETWORK_SEND_BUFF_MAX_SIZE);
     send_msg.msg_type = SDIO_DMA_SEND;
     send_msg.network_data.type = AUDIO_MIDDLE;
-#if AUDIO_SEND_WITH_PROTOCOL_HEADER
     send_msg.network_data.length = packet_len + 16;
-#else
-    send_msg.network_data.length = packet_len;
-#endif
     send_msg.network_data.flag = 0;
     if(pdPASS != send_msg_to_network_task(&send_msg,NULL))
     {
@@ -277,11 +262,7 @@ void network_send_data_task(void *p_arg)
                     //    {
                     //         mprintf("%02x", (uint8_t)p[i]);
                     //    }
-                       #if AUDIO_SEND_WITH_PROTOCOL_HEADER
-                       ret = network_send((int8_t *)data->payload, data->length);  
-                       #else
-                       ret = network_send((int8_t *)data->payload + 16, data->length - 16);   
-                       #endif   
+                       ret = network_send((int8_t *)data->payload, data->length);
                     }
                     break;
                 } 

@@ -788,7 +788,11 @@ void pdm_alc_right_config(pdm_alc_use_config_t* ALC_str)
 #define ALC_NOISE_GATE  PDM_GATE_DISABLE
 #define ALC_NOISE_GATE_SET  PDM_NOISE_GATE_THRE_45dB
 #define ALC_INIT_PGA_GAIN   0x1f
+#if INNER_CODEC_AUDIO_IN_USE_RESAMPLE
+#define ALC_SAMPLE_RATE     PDM_SAMPLERATE_32K
+#else
 #define ALC_SAMPLE_RATE     PDM_SAMPLERATE_16K
+#endif
 #define ALC_LOW_8_BIT_MAX_LEVEL     ((uint8_t)(PDM_ALC_LEVEL__6dB >> 0))
 #define ALC_HOGH_8_BIT_MAX_LEVEL    ((uint8_t)(PDM_ALC_LEVEL__6dB >> 8))
 #define ALC_LOW_8_BIT_MIN_LEVEL     ((uint8_t)(PDM_ALC_LEVEL__7_5dB >> 0))
@@ -899,7 +903,37 @@ static void pdm_aux_alc_init_config(void)
     }
 }
 
+void pdm_gain_set(pdm_cha_sel_t cha,float gain)
+{
+    int32_t gain_data_reg = 0;//((int32_t)(gain * 0.5f) + 197);
+    if(gain > 28.5f)
+    {
+        gain_data_reg = 0xff;
+    }
+    else if(gain < -98.5f)
+    {
+        gain_data_reg = 0;
+    }
+    else
+    {
+        gain_data_reg = (int32_t)((float)gain * 2.0f) + 197;
+    }
 
+    mprintf("gain_data_reg %x\n",gain_data_reg);
+
+    if(PDM_LEFT_CHA == cha)
+    {
+        ALC_PDM->reg50 &=~(0xFF << 0);
+        ALC_PDM->reg50 |= (gain_data_reg << 0);
+        ALC_PDM->reg52 |= 0x1;
+    }
+    else
+    {
+        ALC_PDM->reg51 &=~(0xFF << 0);
+        ALC_PDM->reg51 |= (gain_data_reg << 0);
+        ALC_PDM->reg53 |= 0x1;
+    }
+}
 
 int pdm_init(void)
 {
@@ -918,11 +952,13 @@ int pdm_init(void)
     pdm_adc_init_config();
     //ALC设置
     pdm_alc_init_config();
-    pdm_adc_dig_gain_set(PDM_LEFT_CHA,0);
-    pdm_adc_dig_gain_set(PDM_RIGHT_CHA,0);
+    // pdm_adc_dig_gain_set(PDM_LEFT_CHA,0);
+    // pdm_adc_dig_gain_set(PDM_RIGHT_CHA,0);
     *(volatile uint32_t*)(HAL_PDM_BASE + 0x260) |= (1<<0) | (1<<1);
 
-    pdm_aux_alc_init_config();
+    // pdm_aux_alc_init_config();
+    pdm_gain_set(PDM_LEFT_CHA,10);
+    pdm_gain_set(PDM_RIGHT_CHA,10);
 }
 
 

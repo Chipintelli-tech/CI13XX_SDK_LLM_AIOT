@@ -8,14 +8,7 @@
 #include "vp_nn_cmpt_port_host.h"
 #include "status_share.h"
 #include "remote_api_for_host.h"
-
-
-static inline float hard_fsqrt(float x)
-{
-	float y;
-	asm volatile("fsqrt.s %0,%1":"=f"(y):"f"(x));
-	return y;
-}
+#include "bnpu_math.h"
 
 void cosin_metric(float *a, float *b,float* cos)
 {
@@ -34,7 +27,6 @@ void cosin_metric(float *a, float *b,float* cos)
 	res = m / (n_a * n_b);
 	*cos = res;
 }
-
 
 bool vp_nn_cmpt(int type,float* out_vec,int fe_len,int cmpt_time,
 				int start_frm,int valid_frm)

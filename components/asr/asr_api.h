@@ -13,7 +13,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+#include <stdbool.h>
 /**
  * @addtogroup asr
  * @{
@@ -35,7 +35,7 @@ extern int asrtop_asrpcmbuf_mem_cfg(unsigned int buf_base_ptr,int frm_nums,int f
  * 
  * @return int 0 asr 系统任务创建成功；-1 asr 系统任务创建失败
  */
-extern int asrtop_taskmanage_create(void);
+extern int asrtop_taskmanage_create(bool use_ulxx_type);
 
 /**
  * @brief asr 系统重启，第一次可直接调用 asrtop_asrtop_asr_system_start 系统的启动；

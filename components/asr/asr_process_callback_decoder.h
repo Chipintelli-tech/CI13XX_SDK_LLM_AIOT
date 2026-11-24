@@ -21,7 +21,6 @@ extern "C" {
 #endif
   
 #include "command_info.h"
-  
 typedef struct
 {
     char* cmd_word;

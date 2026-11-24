@@ -2,7 +2,11 @@
 #include "system_msg_deal.h"
 #include "ir_remote_driver.h"
 #include "FreeRTOS.h"
+#if SIMPLE_AUDIO_PLAYER_ENABLE
+#include "simple_audio_player.h"
+#else
 #include "audio_play_api.h"
+#endif
 #include "timers.h"
 #include "prompt_player.h"
 #include "led_light_control.h"
@@ -84,7 +88,11 @@ void userapp_test_state_recv_cmd(uint8_t cmd)
 				vPortFree(ir_level_recv_code);
 				g_test_state=BOARD_STATE_IR_SEND_START;
 				set_ir_level_code_addr_for_test((uint32_t)ir_level_code,IR_LEVEL_SIZE);
+				#if SIMPLE_AUDIO_PLAYER_ENABLE
+				sap_stop();
+				#else
 				stop_play(NULL,NULL);
+				#endif
 				test_board_send_protocol(EUT_STATE_IR_SEND_START);//				
 				xTimerStart(timer_test_send_repeat,0);
 

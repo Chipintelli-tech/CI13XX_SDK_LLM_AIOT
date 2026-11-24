@@ -9,7 +9,8 @@ extern "C" {
 typedef struct
 {   
     uint8_t  vad_start_flag;            //vad 开始标记
-    uint8_t  vad_end_flag;              //vad 结束标记    
+    uint8_t  vad_end_flag;              //vad 结束标记
+    uint16_t start_frame;
 }pwk_param_t;
 
 typedef struct 

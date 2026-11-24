@@ -34,7 +34,7 @@ CiasAiotRunParamTypedef gCiasAiotRunParam =
 };
 CiasAiotFuncParamTypedef gCiasAiotFuncParam =
     {
-        .vad_end_mute_param_index = VOX_VAD_END_CONFIDENCE_DEFAULT,
+        //.vad_end_mute_param_index = VOX_VAD_END_CONFIDENCE_DEFAULT,
         .wake_up_continue_timeout = EXIT_WAKEUP_TIME / 1000, // 以S为单位
         .audio_play_mode = AUDIO_PLAY_MODE,
         .upload_audio_by_denoise = UPLOAD_NNDENOISE_AUDIO_DATA_ENABLE,
@@ -202,10 +202,12 @@ void cloud_ans_count_timer_callback(TimerHandle_t xTimer)
 }
 bool voice_upload_task_init(void)
 {
+#if USE_NN_VAD
     if (!xTaskCreate(vad_state_handle_task, "vad_state_handle_task", 256, NULL, 4, NULL))
     {
         mprintf("error %s  %d\n", __func__, __LINE__);
         return false;
     }
+#endif
     return true;
 }

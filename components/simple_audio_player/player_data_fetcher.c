@@ -84,6 +84,7 @@ void pdf_deinit(void)
         taskENTER_CRITICAL();
         data_fetch_task_info.src_data_info.data_size = 0;
         data_fetch_task_info.data_offset = 0;
+        if(data_fetch_task_info.data_buffer != NULL)
         xStreamBufferReset(data_fetch_task_info.data_buffer);
         taskEXIT_CRITICAL();
         vTaskDelay(1);
@@ -144,7 +145,10 @@ void task_data_fetch(void *pvParameters)
                         {
                             mprintf("play stop sync state to wifi ....\r\n");
                             ret = false;
-                            ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE); // 设置播放结束
+                            if(CI_SS_PLAY_STATE_PLAYING == ciss_get(CI_SS_PLAY_STATE))
+                            {
+                                ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE); // 设置播放结束
+                            }
                             if (!gCiasAiotFuncParam.upload_play_full_duplex)
                             {
                                 ciss_set(CI_SS_VOX_WORK_STATE, 1); // 开启vox vad计算
@@ -246,10 +250,8 @@ int32_t pdf_push_data(uint8_t *data, uint32_t data_size, TickType_t xTicksToWait
     xSemaphoreTake(fetch_sem, pdMS_TO_TICKS(1000)); 
     size_t write_bytes = xStreamBufferSend(data_fetch_task_info.data_buffer, data, data_size, xTicksToWait);
     xSemaphoreGive( fetch_sem );//给出互斥量
-    // for (int i = 0; i < 10; i++)
-    // {
-    //        mprintf("zt data_size =%d\r\n",data[i]);
-    // }   
+
+
     if (write_bytes > 0)
     {
         data_fetch_task_info.data_offset += write_bytes;

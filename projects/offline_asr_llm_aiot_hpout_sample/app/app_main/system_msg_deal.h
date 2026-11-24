@@ -44,7 +44,6 @@ typedef struct
 	uint32_t asr_pcm_base_addr;
     short asr_score;
     uint16_t asr_frames;
-	nlp_data_t nlp_data;
 }sys_msg_asr_data_t;
 
 /************************************
@@ -137,8 +136,6 @@ typedef enum
     SYS_MSG_TYPE_AUDIO_IN_STARTED,
     SYS_MSG_TYPE_I2C,
     SYS_MSG_TYPE_SED,
-	SYS_MSG_TYPE_NLP,
-    SYS_MSG_TYPE_NLP_RESULT,
 	SYS_MSG_TYPE_TEXT,
     SYS_MSG_TYPE_SET_PALY_PARAMETER,//音量，语速，语调
     SYS_MSG_TYPE_FACTORY_TEST_PLAY,    //生产测试播放

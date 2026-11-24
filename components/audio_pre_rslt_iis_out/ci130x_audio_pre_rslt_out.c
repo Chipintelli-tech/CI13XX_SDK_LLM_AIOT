@@ -20,6 +20,18 @@
 #include "status_share.h"
 #include "user_config.h"
 #include "ci_audio_wrapfft.h"
+#if AUTO_GET_AEC_GAIN
+#include "alg_preprocess.h"
+#include "cias_network_msg_protocol.h"
+#include "es7243e.h"
+#endif
+#if USE_NN_DENOISE && DENOISE_STRENGTH_ADAPT_ENABLE
+#include "noise_energy_estimation_api.h"
+#endif
+#if IF_USE_ANOTHER_CODEC_TO_GET_REF && INNER_CODEC_AUDIO_IN_USE_RESAMPLE && (AUDIO_DATA_UPLOAD_BY_IIS || USE_IIS1_OUT_PRE_RSLT_AUDIO)
+#define RESAMPLE_AND_ANOTHER_CODEC_IIS  1   //重采样开启并且启用外部codec，IIS0使用32khz
+#include "ci_alg_common_api.h"
+#endif
 #define BUFFER_NUM (4)
 typedef struct
 {
@@ -55,20 +67,376 @@ void sine_wave_generate(int16_t *sine_wave, uint32_t sample_rate, uint32_t wave_
         sine_wave[i] = (int16_t)(32767.0f * sinf((2 * PI * i) / num_of_one_period));
     }
 }
+#if AUTO_GET_AEC_GAIN
+extern CiasAiotFuncParamTypedef gCiasAiotFuncParam;
+extern cm_codec_hw_info_t host_mic_hw_info;
+extern audio_capture_t audio_capture;
+extern void es7243e_alc_maxgain_set(float gain);
+extern int8_t es7243e_alc_gate_en(es7243e_alc_gate_t ALC_gate);
+void auto_get_aec_gain(ci_wrapfft_audio * p_wrapfft_audio)
+{
+    int64_t eng_mic_eng= 0;
+    int64_t eng_ref_eng= 0;
+    static uint8_t volume = 0;
+    uint16_t real_len;
+    uint8_t test_rslt = 0;
+    static int32_t sum_mic_eng =0;
+    static int32_t sum_ref_eng =0;
+    static uint8_t cnt =0;
+    static uint8_t err_cnt =0;
+    static uint8_t frame_cnt =0;
+    static int8_t pga_gain_mic = 0;
+    static int8_t pga_gain_ref = 0;
+    static float  aec_enable_thr = 0;
+    static bool calc_flag = false;
+    //获取当前mic和ref增益
+    if(pga_gain_mic == 0)
+    pga_gain_mic = (int8_t)host_mic_hw_info.codec_gain.pga_gain_l;
+    if(pga_gain_ref == 0)
+    {
+        #if !REF_IN_FROM_INNER_CODEC
+        if(audio_capture.mic_channel_num == 2)
+        {
+            extern float es7243e_init_gain;
+            pga_gain_ref = (int8_t)es7243e_init_gain;
+        }
+        else
+        #endif
+        pga_gain_ref = (int8_t)host_mic_hw_info.codec_gain.pga_gain_r;
+    }
 
+    do
+    {
+        if(gCiasAiotFuncParam.aec_gain_get_state == GET_AEC_GAIN_MIC)
+        {
+            if(volume == 0)
+            volume = vol_get();
+            if (CI_SS_PLAY_STATE_PLAYING == ciss_get(CI_SS_PLAY_STATE))
+            {
+                calc_flag = true;
+                if(cnt >= 60 && frame_cnt<150)
+                {
+                    for(int i = 0; i < AUDIO_CAP_POINT_NUM_PER_FRM; i++)
+                    {
+                        eng_mic_eng += p_wrapfft_audio->mic[0][i] * p_wrapfft_audio->mic[0][i];
+                    }
+                    sum_mic_eng += sqrt(eng_mic_eng/AUDIO_CAP_POINT_NUM_PER_FRM); 
+                    frame_cnt++;
+                }
+                else
+                cnt++;
+            }
+            else if(CI_SS_PLAY_STATE_IDLE == ciss_get(CI_SS_PLAY_STATE) && calc_flag)
+            {
+                if(sum_mic_eng != 0)
+                {
+                    if(sum_mic_eng/frame_cnt > ENERGE_UP_THR)
+                    {
+                        mprintf("cur eng = %d\r\n",sum_mic_eng/frame_cnt);
+                        if(pga_gain_mic >= (gCiasAiotFuncParam.aec_min_mic_gain+2))
+                        {
+                            pga_gain_mic -= 2;
+                            mprintf("pga_gain_mic =%d\r\n",pga_gain_mic);
+                            cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, pga_gain_mic);
+                        }
+                        else if(volume > VOLUME_MIN)
+                        {
+                            volume -= 1;
+                            mprintf("volume =%d\r\n",volume);
+                            audio_play_set_vol_gain(67*volume/VOLUME_MAX + 7);
+                        }
+                        else
+                        {
+                            test_rslt = 0;
+                            cias_send_cmd_and_data(CIAS_AEC_GAIN_RESULT, &test_rslt, 1, DEF_FILL);
+                        }                   
+                    }
+                    else
+                    {
+                        mprintf("dst eng = %d\r\n",sum_mic_eng/frame_cnt);
+                        gCiasAiotFuncParam.aec_gain_get_state = GET_AEC_GAIN_REF;
+                        err_cnt = 0;
+                    }
+                    sum_mic_eng =0;
+                    frame_cnt =0;
+                    cnt = 0;
+                    prompt_play_by_voice_id(GET_AEC_GAIN_AUDIO_ID, NULL, true);  //播放测试音频
+                }
+                else
+                {
+                    err_cnt++;
+                    break;
+                }
+                calc_flag = false;
+            }  
+        }
+        if(gCiasAiotFuncParam.aec_gain_get_state == GET_AEC_GAIN_REF)
+        {
+            if (CI_SS_PLAY_STATE_PLAYING == ciss_get(CI_SS_PLAY_STATE))
+            {
+                calc_flag = true;
+                if(cnt >= 60 && frame_cnt<150)
+                {
+                    for(int i = 0; i < AUDIO_CAP_POINT_NUM_PER_FRM; i++)
+                    {
+                        eng_mic_eng += p_wrapfft_audio->mic[0][i] * p_wrapfft_audio->mic[0][i];
+                        eng_ref_eng += p_wrapfft_audio->ref[0][i] * p_wrapfft_audio->ref[0][i];
+                    }
+                    sum_mic_eng += sqrt(eng_mic_eng/AUDIO_CAP_POINT_NUM_PER_FRM); 
+                    sum_ref_eng += sqrt(eng_ref_eng/AUDIO_CAP_POINT_NUM_PER_FRM);
+                    frame_cnt++;
+                }
+                else
+                cnt++;
+            }
+            else if(CI_SS_PLAY_STATE_IDLE == ciss_get(CI_SS_PLAY_STATE) && calc_flag)
+            {
+                if(sum_mic_eng != 0 && sum_ref_eng != 0)
+                {
+                    // mprintf("sum_ref_eng =%d\r\n",sum_ref_eng/frame_cnt);
+                    // mprintf("sum_mic_eng =%d\r\n",sum_mic_eng/frame_cnt);
+                    mprintf("GET_AEC_GAIN_REF\r\n");
+                    if((float)sum_mic_eng/sum_ref_eng > 6.0f)
+                    {
+                        pga_gain_ref += 2;
+                        mprintf("pga_gain_ref =%d\r\n",pga_gain_ref);
+                        #if !REF_IN_FROM_INNER_CODEC
+                        if(audio_capture.mic_channel_num == 2)
+                        {
+                            es7243e_alc_gate_en(ES7243E_ALC_ON);
+                            es7243e_alc_maxgain_set((float)pga_gain_ref);
+                            es7243e_alc_gate_en(ES7243E_ALC_OFF);
+                        }
+                        else
+                        #endif
+                        {
+                            cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, pga_gain_ref);
+                        }
+                        prompt_play_by_voice_id(GET_AEC_GAIN_AUDIO_ID, NULL, true);  //播放测试音频
+                    }
+                    else if(sum_ref_eng/frame_cnt >= ENERGE_UP_THR)
+                    {
+                        pga_gain_ref -= 2;
+                        mprintf("pga_gain_ref =%d\r\n",pga_gain_ref);
+                        #if !REF_IN_FROM_INNER_CODEC
+                        if(audio_capture.mic_channel_num == 2)
+                        {
+                            es7243e_alc_gate_en(ES7243E_ALC_ON);
+                            es7243e_alc_maxgain_set((float)pga_gain_ref);
+                            es7243e_alc_gate_en(ES7243E_ALC_OFF);
+                        }
+                        else
+                        #endif
+                        {
+                            cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, pga_gain_ref);
+                        }
+                        prompt_play_by_voice_id(GET_AEC_GAIN_AUDIO_ID, NULL, true);  //播放测试音频
+                    }
+                    else
+                    {
+                        gCiasAiotFuncParam.aec_gain_get_state = GET_AEC_GAIN_REF_THR;
+                        err_cnt = 0;
+                        audio_play_set_vol_gain(67*5/VOLUME_MAX + 7);
+                        prompt_play_by_voice_id(GET_AEC_REF_THR_AUDIO_ID, NULL, true);  //播放测试音频
+                    }
+                    sum_mic_eng =0;
+                    frame_cnt =0;
+                    cnt = 0;
+                    
+                }
+                else
+                {
+                    err_cnt++;
+                    break;
+                }
+                calc_flag = false;
+            }  
+        }
+        if(gCiasAiotFuncParam.aec_gain_get_state == GET_AEC_GAIN_REF_THR)
+        {
+            if (CI_SS_PLAY_STATE_PLAYING == ciss_get(CI_SS_PLAY_STATE))
+            {
+                calc_flag = true;
+                if(cnt >= 60 && frame_cnt<150)
+                {
+                    if (aec_enable_thr < 0.001f)
+                    {
+                        aec_enable_thr = p_wrapfft_audio->cur_aec_ref_eng;
+                    }
+                    if(aec_enable_thr > p_wrapfft_audio->cur_aec_ref_eng)
+                    {
+                        aec_enable_thr = p_wrapfft_audio->cur_aec_ref_eng;
+                    }
+                    frame_cnt++;
+                }
+                cnt++;
+            }
+            else if(CI_SS_PLAY_STATE_IDLE == ciss_get(CI_SS_PLAY_STATE) && calc_flag)
+            {
+                if(aec_enable_thr > 0.001f)
+                {
+                    mprintf("pga_gain_mic =%d\r\n",pga_gain_mic);
+                    mprintf("pga_gain_ref =%d\r\n",pga_gain_ref);
+                    mprintf("volume =%d\r\n",volume);
+                    mprintf("aec_enable_thr =%d\r\n",(int32_t)aec_enable_thr);
+                    uint8_t gain_rslt[7] = {0};
+                    gain_rslt[0] = pga_gain_mic;
+                    gain_rslt[1] = pga_gain_ref;
+                    gain_rslt[2] = volume;
+                    gain_rslt[3] = ((int32_t)aec_enable_thr & 0xff);
+                    gain_rslt[4] = (((int32_t)aec_enable_thr >> 8) & 0xff);
+                    gain_rslt[5] = (((int32_t)aec_enable_thr >> 16) & 0xff);
+                    gain_rslt[6] = (((int32_t)aec_enable_thr >> 24) & 0xff);
+                    cias_send_cmd_and_data(CIAS_AEC_GAIN_RESULT, &gain_rslt, 7, DEF_FILL);
+                    gCiasAiotFuncParam.aec_gain_get_state = GET_AEC_GAIN_IDLE;
+                    err_cnt = 0;
+                    frame_cnt =0;
+                    cnt = 0;
+                    aec_enable_thr = 0.0f;
+                    pga_gain_ref =0;
+                    pga_gain_mic =0;
+                    audio_play_set_vol_gain(67*volume/VOLUME_MAX + 7);
+                }
+                else
+                {
+                    err_cnt++;
+                    break;
+                }
+                calc_flag = false;
+            }
+        }
+    }while (0);
+
+    if(gCiasAiotFuncParam.aec_gain_get_state != GET_AEC_GAIN_IDLE)
+    {
+        if(err_cnt >= 3)
+        {
+            mprintf("aec test err\r\n");
+            test_rslt = 0;
+            err_cnt = 0;
+            frame_cnt =0;
+            cnt = 0;
+            aec_enable_thr = 0.0f;
+            pga_gain_ref =0;
+            pga_gain_mic =0;
+            cias_send_cmd_and_data(CIAS_AEC_GAIN_RESULT, &test_rslt, 1, DEF_FILL);
+            gCiasAiotFuncParam.aec_gain_get_state = GET_AEC_GAIN_IDLE;
+        }
+        else if(err_cnt != 0 && calc_flag && (CI_SS_PLAY_STATE_IDLE == ciss_get(CI_SS_PLAY_STATE)))
+        {
+            if(gCiasAiotFuncParam.aec_gain_get_state == GET_AEC_GAIN_MIC || gCiasAiotFuncParam.aec_gain_get_state == GET_AEC_GAIN_REF)
+            prompt_play_by_voice_id(GET_AEC_GAIN_AUDIO_ID, NULL, true);  //播放测试音频
+            if(gCiasAiotFuncParam.aec_gain_get_state == GET_AEC_GAIN_REF_THR)
+            prompt_play_by_voice_id(GET_AEC_REF_THR_AUDIO_ID, NULL, true);  //播放测试音频
+            calc_flag = false;
+        }
+        update_awake_time(); // 更新本地唤醒时间
+    }
+    
+}
+#endif
+#if DEBUG_AUDIO_UART_UPLOAD_EN
+StreamBufferHandle_t gUartRecordStreamBuffer = NULL; // 串口采音队列
+void audio_pre_rslt_write_data_from_uart(uint32_t addr, uint32_t size)
+{
+    // init_timer0();
+    // timer0_start_count();
+    if (!uart_dma_trans_done)
+    {
+        // mprintf("pre voice data overflow\n");
+    }
+    uart_dma_trans_done = 0;
+    extern void set_dma_int_callback(DMACChannelx dmachannel, dma_callback_func_ptr_t func);
+    set_dma_int_callback(DMACChannel1, uart_dma_read_irq_callback);
+
+    DMAC_Peripherals uart_dma_peripherals_num = DMAC_Peripherals_UART0_TX;
+    uint32_t uart_fifo_addr = UART0FIFO_BASE;
+    if (((uint32_t)USE_UART_SEND_PRE_RSLT_AUDIO_NUMBER == (uint32_t)UART1))
+    {
+        uart_dma_peripherals_num = DMAC_Peripherals_UART1_TX;
+        uart_fifo_addr = UART1FIFO_BASE;
+    }
+    else if (((uint32_t)USE_UART_SEND_PRE_RSLT_AUDIO_NUMBER == (uint32_t)UART2))
+    {
+        uart_fifo_addr = UART2FIFO_BASE;
+        uart_dma_peripherals_num = DMAC_Peripherals_UART2_TX;
+    }
+
+    DMAC_M2P_P2M_advance_config(DMACChannel1, uart_dma_peripherals_num, M2P_DMA, addr, uart_fifo_addr, size,
+                                TRANSFERWIDTH_8b, BURSTSIZE1, DMAC_AHBMaster1);
+    // while(!uart_dma_trans_done);
+    // uart_dma_trans_done = 0;
+    // timer0_end_count_only_print_time_us();
+}
+
+// 串口录音任务
+void uart_record_task(void *p_arg)
+{
+    uint16_t stream_aviable_len = 0;
+    int8_t record_rx_temp[AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t)] = {0};
+    int count = 0;
+    int8_t *p;
+    while (1)
+    {
+        stream_aviable_len = xStreamBufferBytesAvailable(gUartRecordStreamBuffer);
+        if (stream_aviable_len >= AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t))
+        {
+            // ci_loginfo(LOG_USER,"zt test1\n");
+            memset(record_rx_temp, 0, AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t));
+            int rx_size = xStreamBufferReceiveFromISR(gUartRecordStreamBuffer, record_rx_temp, AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t), portMAX_DELAY);
+            if (rx_size > 0)
+            {
+                audio_pre_rslt_write_data_from_uart((uint32_t)record_rx_temp, rx_size);
+            }
+            vTaskDelay(pdMS_TO_TICKS(15));
+        }
+        else
+        {
+            vTaskDelay(pdMS_TO_TICKS(3));
+        }
+    }
+}
+void uart_send_voice_init(void)
+{
+    UARTDMAConfig((UART_TypeDef *)USE_UART_SEND_PRE_RSLT_AUDIO_NUMBER, USE_UART_SEND_PRE_RSLT_AUDIO_BAUD);
+    gUartRecordStreamBuffer = xStreamBufferCreate(USE_UART_SEND_PRE_RSLT_AUDIO_BUF_LEN, 1);
+    if(gUartRecordStreamBuffer)
+    {
+        xTaskCreate(uart_record_task, "uart_record_task", AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t) + 32, NULL, 4, NULL);
+    }
+    else
+    {
+        mprintf("uart record init error\r\n");
+    }
+}
+#endif
 uint32_t tmp_voice_addr = 0;
-
+#if RESAMPLE_AND_ANOTHER_CODEC_IIS
+ci_common_handle_t * ci_common_handle= NULL;
+int16_t *g_frame_tmp = NULL;
+#endif
 uint8_t *uart_send_pre_data_buffer = NULL;
 void audio_pre_rslt_out_play_card_init(void)
 {
     uint16_t block_size = AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t);
-
+#if RESAMPLE_AND_ANOTHER_CODEC_IIS
+    uint32_t flag = CI_COMMON_UPSAMPLE;
+    ci_common_handle = ci_common_create(flag,0,NULL);
+    if(ci_common_handle == NULL)
+    mprintf("ci_common_create fail\r\n");
+    g_frame_tmp = (int16_t *)pvPortMalloc(AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t));
+#endif
     sg_init_tmp_str.init_str.block_size = block_size;
     sg_init_tmp_str.write_data_cnt = 0;
     sg_init_tmp_str.send_data_cnt = 0;
     memset(sg_init_tmp_str.codec_start_flag,false,MAX_CODEC_NUM);
+#if DEBUG_AUDIO_UART_UPLOAD_EN
+    uart_send_voice_init();
+    tmp_voice_addr = pvPortMalloc(block_size);
+    CI_ASSERT(tmp_voice_addr, "\n");
+#endif
 
-#if AUDIO_DATA_PLAY_BY_IIS || ((USE_HP_OUT_NET_AUDIO || USE_HP_OUT_PRE_RSLT_AUDIO) && !SIMPLE_AUDIO_PLAYER_ENABLE)
+#if AUDIO_DATA_PLAY_BY_IIS || USE_HP_OUT_NET_AUDIO || USE_HP_OUT_PRE_RSLT_AUDIO
     audio_pre_rslt_out_codec_init_pa_out();
 #endif
 
@@ -159,7 +527,52 @@ static void audio_eng_calc(ci_wrapfft_audio * p_wrapfft_audio)
     }   
 }
 #endif
+
+#if DEBUG_AUDIO_UART_UPLOAD_EN
+void audio_debug_uart0_upload(int16_t *left, int16_t *right, ci_wrapfft_audio *p_wrapfft_audio)
+{
+    uint32_t block_size = sg_init_tmp_str.init_str.block_size;
+    int16_t *pcm_data_p = (int16_t *)tmp_voice_addr;
+    int num = block_size / sizeof(int16_t) / 2;
+
+    // static int cnt = 0;
+
+    // if (cnt == 30)
+    // {
+    //     uart_send_voice_init();
+    // }
+    // else if (cnt >= 30)
+    // {
+
+        // audio_pre_rslt_write_data_from_uart((uint32_t)tmp_voice_addr,block_size);
+        // #if USE_UART_SEND_PRE_RSLT_RECORD_LEFT
+        // int8_t *src_addr = (int8_t *)left;
+        // #else
+        // int8_t *src_addr = (int8_t *)right;
+        // #endif
+        for (int i = 0; i < num; i++)
+        {
+            pcm_data_p[2 * i] = left[i];
+            pcm_data_p[2 * i + 1] = right[i];
+        }
+        if (gUartRecordStreamBuffer)
+        {
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            int ret = xStreamBufferSendFromISR(gUartRecordStreamBuffer, (int8_t *)pcm_data_p, block_size, &xHigherPriorityTaskWoken);
+            if (ret != block_size)
+            {
+                ci_loginfo(LOG_USER,"zt test2\n");
+                mprintf("xSpeexRecordStreamBuffer send error, send len = %d\r\n", ret);
+            }
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        }
+    // }
+    // else
+    // cnt++;
+}
+#endif
 #if USE_AUDIO_UPLOAD_BY_IIS
+
 void audio_pre_rslt_upload_by_iis(int16_t *left, int16_t *right, ci_wrapfft_audio *p_wrapfft_audio)
 {
     uint32_t write_pcm_addr = 0;
@@ -176,22 +589,49 @@ void audio_pre_rslt_upload_by_iis(int16_t *left, int16_t *right, ci_wrapfft_audi
             return;
         }
         int16_t *pcm_data_p = (int16_t *)write_pcm_addr;
+        #if RESAMPLE_AND_ANOTHER_CODEC_IIS
+        int out_num = num * 2;   // 32kHz 每声道样本数
+        #endif
         for (int i = 0; i < num; i++)
         {     
-            if (gCiasAiotFuncParam.upload_audio_by_denoise) // 上传降噪音频
+            if (gCiasAiotFuncParam.upload_audio_by_denoise) // 上传降噪音频，目前AEC时不进行降噪
             {
-                if(ciss_get(CI_SS_AEC_WORK_STATE))  //AEC处理状态上传AEC处理后，降噪前的数据
+                #if RESAMPLE_AND_ANOTHER_CODEC_IIS
+                g_frame_tmp[2 * i] = right[i];   
+                g_frame_tmp[2 * i + 1] = right[i];
+                #else
+                pcm_data_p[2 * i] = right[i];   
+                pcm_data_p[2 * i + 1] = right[i];
+                #endif
+            }
+            else
+            {
+                if(ciss_get(CI_SS_AEC_WORK_STATE)) 
                 {
-                    pcm_data_p[2 * i] = p_wrapfft_audio->asr_src_data[i];
-                    pcm_data_p[2 * i + 1] = p_wrapfft_audio->asr_src_data[i];
+                    #if RESAMPLE_AND_ANOTHER_CODEC_IIS
+                    g_frame_tmp[2 * i] = right[i];   
+                    g_frame_tmp[2 * i + 1] = right[i];
+                    #else
+                    pcm_data_p[2 * i] = right[i];   
+                    pcm_data_p[2 * i + 1] = right[i];
+                    #endif
                 }
                 else
                 {
-                    pcm_data_p[2 * i] = right[i];   
-                    pcm_data_p[2 * i + 1] = right[i];   //非AEC处理状态上传降噪后的音频
+                    #if RESAMPLE_AND_ANOTHER_CODEC_IIS
+                    g_frame_tmp[2 * i] = p_wrapfft_audio->asr_src_data[i]; //降噪进行时使用降噪前的数据
+                    g_frame_tmp[2 * i + 1] = p_wrapfft_audio->asr_src_data[i];
+                    #else
+                    pcm_data_p[2 * i] = p_wrapfft_audio->asr_src_data[i];   //降噪进行时使用降噪前的数据
+                    pcm_data_p[2 * i + 1] = p_wrapfft_audio->asr_src_data[i];
+                    #endif
                 }
             }
         }
+        #if RESAMPLE_AND_ANOTHER_CODEC_IIS
+        // 升采样左右声道
+        upsample_linear_interp(ci_common_handle,g_frame_tmp,num,pcm_data_p,out_num,true);
+        #endif
         cm_write_codec(PLAY_PRE_AUDIO_CODEC_ID, (void *)write_pcm_addr, 0);
     }
     codec_output_ctl(PLAY_PRE_AUDIO_CODEC_ID);
@@ -218,8 +658,24 @@ void audio_pre_rslt_upload_by_hpout(int16_t *left, int16_t *right, ci_wrapfft_au
         int16_t *pcm_data_p_cpy = (int16_t *)write_pcm_addr_cpy;
         for (int i = 0; i < num; i++)
         {
-            pcm_data_p_cpy[2 * i] = right[i];
-            pcm_data_p_cpy[2 * i + 1] = right[i];
+            if (gCiasAiotFuncParam.upload_audio_by_denoise) // 上传降噪音频，目前AEC时不进行降噪
+            {
+                pcm_data_p_cpy[2 * i] = right[i];   
+                pcm_data_p_cpy[2 * i + 1] = right[i];
+            }
+            else
+            {
+                if(ciss_get(CI_SS_AEC_WORK_STATE)) 
+                {
+                    pcm_data_p_cpy[2 * i] = right[i];   
+                    pcm_data_p_cpy[2 * i + 1] = right[i];
+                }
+                else
+                {
+                    pcm_data_p_cpy[2 * i] = p_wrapfft_audio->asr_src_data[i];   //降噪进行时使用降噪前的数据
+                    pcm_data_p_cpy[2 * i + 1] = p_wrapfft_audio->asr_src_data[i];
+                }
+            }
         }
         cm_write_codec(PLAY_CODEC_ID, (void *)write_pcm_addr_cpy, 0);
     }
@@ -274,9 +730,9 @@ void audio_pre_rslt_upload_by_uart(int16_t *left, int16_t *right, ci_wrapfft_aud
         }
         if (xStreamBufferIsFull(gCiasAiotRunParam.pcm_compress_stream_buffer)) // 缓存满开始清老的数据
         {
-            // mprintf("wakeup_pcm_frame_len is full, remove pcm data: %d frame\r\n", PCM_MSG_STREAM_NUM - PCM_ALG_ROOLBACK_FRAME_LEN);
+            // mprintf("wakeup_pcm_frame_len is full, remove pcm data: %d frame\r\n", PCM_MSG_STREAM_NUM - NN_VAD_BACK_PORCH);
 
-            for (int i = 0; i < (PCM_MSG_STREAM_NUM - PCM_ALG_ROOLBACK_FRAME_LEN); i++)
+            for (int i = 0; i < (PCM_MSG_STREAM_NUM - NN_VAD_BACK_PORCH); i++)
             {
                 int rx_size = xStreamBufferReceiveFromISR(gCiasAiotRunParam.pcm_compress_stream_buffer, speex_src_temp_buf, PCM_ALG_FRAME_LEN, pdMS_TO_TICKS(5));
                 if (rx_size != PCM_ALG_FRAME_LEN)
@@ -294,23 +750,25 @@ void audio_pre_rslt_upload_by_uart(int16_t *left, int16_t *right, ci_wrapfft_aud
         {
             BaseType_t xHigherPriorityTaskWoken = pdFALSE;
             uint8_t *p_upload_src = NULL;
-            if (gCiasAiotFuncParam.upload_audio_by_denoise) // 上传降噪音频
+
+            if (gCiasAiotFuncParam.upload_audio_by_denoise) // 上传降噪音频，目前AEC时不进行降噪
             {
-                if(ciss_get(CI_SS_AEC_WORK_STATE))  //AEC处理状态上传AEC处理后，降噪前的数据
-                {
-                    p_upload_src = p_wrapfft_audio->asr_src_data;
-                }
-                else
-                {
-                    p_upload_src = right;   //非AEC处理状态上传降噪后的音频
-                }
-                ret = xStreamBufferSendFromISR(gCiasAiotRunParam.pcm_compress_stream_buffer, (int8_t *)p_upload_src, PCM_ALG_FRAME_LEN, &xHigherPriorityTaskWoken);
+                ret = xStreamBufferSendFromISR(gCiasAiotRunParam.pcm_compress_stream_buffer, (int8_t *)right, PCM_ALG_FRAME_LEN, &xHigherPriorityTaskWoken);
             }
             else
             {
+                if(ciss_get(CI_SS_AEC_WORK_STATE)) 
+                {
+                    p_upload_src = right;
+                }
+                else
+                {
+                    p_upload_src = p_wrapfft_audio->asr_src_data;   //降噪进行时使用降噪前的数据
+                }
                 //上传降噪之前，AEC处理后的数据
-                ret = xStreamBufferSendFromISR(gCiasAiotRunParam.pcm_compress_stream_buffer, (int8_t *)p_wrapfft_audio->asr_src_data, PCM_ALG_FRAME_LEN, &xHigherPriorityTaskWoken);
+                ret = xStreamBufferSendFromISR(gCiasAiotRunParam.pcm_compress_stream_buffer, (int8_t *)p_upload_src, PCM_ALG_FRAME_LEN, &xHigherPriorityTaskWoken);
             }
+ 
             portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
             if (ret != PCM_ALG_FRAME_LEN)
             {
@@ -375,6 +833,20 @@ void audio_pre_rslt_upload_by_uart(int16_t *left, int16_t *right, ci_wrapfft_aud
 void audio_pre_rslt_write_data(int16_t *left, int16_t *right, uint32_t wrapfft_audio_addr)
 {
     ci_wrapfft_audio *p_wrapfft_audio = (ci_wrapfft_audio *)wrapfft_audio_addr;   //p_wrapfft_audio->asr_src_data);
+
+    #if USE_NN_DENOISE && DENOISE_STRENGTH_ADAPT_ENABLE
+    extern noise_est_config_t nn_noise_est_config;
+    if(nn_noise_est_config.noise_est_debug)
+    {
+        mprintf("noise_log_energy =%d\r\n",(int32_t)p_wrapfft_audio->noise_log_energy);
+    }
+    #endif
+#if AUTO_GET_AEC_GAIN
+    auto_get_aec_gain(p_wrapfft_audio);
+#endif
+#if DEBUG_AUDIO_UART_UPLOAD_EN
+    audio_debug_uart0_upload(left,right,p_wrapfft_audio);
+#endif
 #if IIS_CHANNEL_ENG_CALC_EANBLE
     audio_eng_calc(p_wrapfft_audio);
 #endif

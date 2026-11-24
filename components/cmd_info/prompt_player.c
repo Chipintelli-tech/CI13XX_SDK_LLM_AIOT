@@ -645,7 +645,6 @@ uint32_t prompt_play_by_multi_cmd_id(prompt_play_info_t *p_play_info, int number
     #else
     pause_asr(1, 1);
     #endif
-    
 	#if SIMPLE_AUDIO_PLAYER_ENABLE
 	sap_play(prompt_player.combination_list[prompt_player.combination_index++], combination_callback);
 	#else

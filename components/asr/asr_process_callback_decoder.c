@@ -21,10 +21,9 @@
 #include "system_msg_deal.h"
 #include "status_share.h"
 #include "cias_network_msg_protocol.h"
-// #include "voiceprint_port.h"
-
 #include "ci_nlp.h"
 #include "ci_log.h"
+#include "cias_aiot_protocol.h"
 int nlp_cmd_cnt_default()
 {
     return NLP_CMD_CNT_DEFAULT;
@@ -64,11 +63,10 @@ int send_asr_pre_confirm_msg(uint32_t cmd_handle)
 {
     return 0;
 }
-
-/* #if !USE_CWSL
-void get_cwsl_threshold(unsigned char *wakeup_threshold,unsigned char *cmdword_threshold )
-{}
-#endif */ 
+int set_post_min_cnt()
+{
+    return POST_MIN_CNT;
+}
 
 int asr_result_callback(callback_asr_result_type_t *asr)
 {
@@ -118,34 +116,59 @@ int asr_result_callback(callback_asr_result_type_t *asr)
             }
         #endif
     #endif
-        #if (MULT_INTENT < 2)
-           #if USE_AI_DOA
-            #if USE_CWSL
-            if (!ciss_get(CI_SS_CWSL_IN_REG))  //学习状态不进行doa流程
-            #endif
-            {
-                   // mprintf("--asr->voice_start_frame = %d\r\n", asr->voice_start_frame);
-                   // mprintf("asr->vocie_valid_frame_len = %d\r\n", asr->vocie_valid_frame_len);
-                    ciss_set(CI_SS_WAKE_UP_START_INDEX_FOR_DOA,  asr->voice_start_frame);
-                    ciss_set(CI_SS_WAKE_UP_VALID_FRAME_LEN_FOR_DOA,  asr->vocie_valid_frame_len);
-                }
-            #endif
-        #endif
         #if USE_PWK
         //mprintf("--asr->voice_start_frame = %d\r\n", asr->voice_start_frame);
         //mprintf("--asr->vocie_valid_frame_len = %d\r\n", asr->vocie_valid_frame_len);
         ciss_set(CI_SS_WAKE_UP_START_INDEX_FOR_PWK,  asr->voice_start_frame);
         ciss_set(CI_SS_WAKE_UP_VALID_FRAME_LEN_FOR_PWK,  asr->vocie_valid_frame_len);
         #endif
-        #if (MULT_INTENT < 2)
-        // 如果识别结果是唤醒词 "你好，方太"，就发个无效指令给s3，让其通知服务器忽略掉
-        #if CIAS_AIOT_DEMO_ENABLE
-        if (0 == strcmp(asr->cmd_word, "小爱小爱"))
+        #if AUTO_GET_AEC_GAIN
+        extern CiasAiotFuncParamTypedef gCiasAiotFuncParam;
+        if(gCiasAiotFuncParam.aec_gain_get_state != GET_AEC_GAIN_IDLE)
+        return;
+        #endif
+        #if (USE_NN_DOA)&&USE_AEC_MODULE   //必须放在发系统消息之前，
+        #if USE_CWSL
+        if (!ciss_get(CI_SS_CWSL_IN_REG))  //学习状态不进行doa流程
         #endif
         {
-            cias_send_cmd(SKIP_INVAILD_SPEAK, DEF_FILL);
-            mprintf("检测到唤醒词\n");
+            if (CI_SS_PLAY_STATE_PLAYING != ciss_get(CI_SS_PLAY_STATE))
+            {
+                ciss_set(CI_SS_WAKE_UP_START_INDEX_FOR_DOA,  asr->voice_start_frame);
+                ciss_set(CI_SS_WAKE_UP_VALID_FRAME_LEN_FOR_DOA,  asr->vocie_valid_frame_len);
+                ciss_set(CI_SS_ALG_DOA_IS_BUSYING, 1);
+                int m_try_count = 200;
+                while(m_try_count--)  //最多延迟1S
+                {
+                    if(ciss_get(CI_SS_ALG_DOA_IS_BUSYING))
+                    {
+                        vTaskDelay(pdMS_TO_TICKS(5));
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
         }
+        #elif USE_NN_DOA
+        // mprintf("asr->voice_start_frame = %d\r\n", asr->voice_start_frame);
+        // mprintf("asr->vocie_valid_frame_len = %d\r\n", asr->vocie_valid_frame_len);
+        #if USE_CWSL
+            if (!ciss_get(CI_SS_CWSL_IN_REG))  //学习状态不进行doa流程
+        #endif
+            {
+                ciss_set(CI_SS_WAKE_UP_START_INDEX_FOR_DOA,  asr->voice_start_frame);
+                ciss_set(CI_SS_WAKE_UP_VALID_FRAME_LEN_FOR_DOA,  asr->vocie_valid_frame_len);
+            }
+        #endif
+        #if GCC_DOA_OUT_TYPE
+        extern int ci_get_doa_angle(void);
+        int angle = ci_get_doa_angle();
+        mprintf("--------doa angle: %d°\n", angle);
+        cias_send_cmd_and_data(DOA_ANGLE,&angle,4,DEF_FILL);
+        #endif
+        //离在线不支持多意图
         mprintf("send result:%s %d\n", asr->cmd_word, asr->confidence);
         sys_msg_t send_msg;
         send_msg.msg_type = SYS_MSG_TYPE_ASR;
@@ -158,20 +181,11 @@ int asr_result_callback(callback_asr_result_type_t *asr)
         send_msg.msg_data.asr_data.asr_frames = asr->vocie_valid_frame_len;
         send_msg_to_sys_task(&send_msg, NULL);
         ret = 1;
-        #else
-        //mprintf("decoded_frames=%d \n", asr->frm);
-        //mprintf("*************sil=%d******** \n", asr->sil_cfd);
-        //mprintf("nlp asr->voice_start_frame = %d\r\n", asr->voice_start_frame);
-       // mprintf("nlp asr->vocie_valid_frame_len = %d\r\n", asr->vocie_valid_frame_len);
-        ret = asr_result_callback_nlp(asr->cmd_word, asr->confidence, asr->frm, asr->sil_cfd, asr->path_node_cfd, asr->voice_start_frame, asr->vocie_valid_frame_len);
-        
-        #endif
     }
-    //else
+    else
     {
-        //mprintf("asr->cmd_handle is INVALID_HANDLE\n");
         ret = 1;
-    }
+    } 
 #endif
     return ret;
 }
@@ -179,7 +193,6 @@ int asr_result_callback(callback_asr_result_type_t *asr)
 
 int asr_lite_result_callback(char * words,short cfd)
 {
-    //mprintf("out2 :%s %d\n",words,cfd);
     /*add code for app*/
     
     return 0;

@@ -93,7 +93,7 @@ void snore_cloud_cmd_init_call(void)
 }
 #endif   //USE_SED_SNORE
 
-#if USE_AI_DOA  
+#if USE_NN_DOA  
 DOACloudCmdProtocolTypedef gDOACloudCmdProtocol[DOA_STATE_MAX] = {0};
 void doa_cloud_cmd_param_init(const DOACloudCmdProtocolTypedef *doaCloudCmdProtocol)
 {
@@ -124,5 +124,5 @@ void doa_cloud_cmd_init_call(void)
     };
     doa_cloud_cmd_param_init(mDOACloudCmdProtocol);
 }
-#endif   //USE_AI_DOA
+#endif   //USE_NN_DOA
 #endif   //CLOUD_UART_PROTOCOL_EN

@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include "system_msg_deal.h"
 #include "ci130x_gpio.h"
-#include "audio_play_os_port.h"
 #include "semphr.h"
 
 

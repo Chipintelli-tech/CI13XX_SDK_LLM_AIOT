@@ -6,8 +6,6 @@ extern "C"
 {
 #endif
 
-
-
 /**
  * @brief 按命令词ID响应asr消息处理
  * 
@@ -44,9 +42,6 @@ uint32_t deal_userdef_msg(sys_msg_t *msg);
  */
 void userapp_deal_key_msg(sys_msg_key_data_t  *key_msg);
 
-
-void jw_key_init();
-void jw_key_manage_task(void *p);
 #ifdef __cplusplus
 }
 #endif

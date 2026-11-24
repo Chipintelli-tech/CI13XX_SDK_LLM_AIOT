@@ -37,7 +37,7 @@ extern void uart_log_int_mode_init(void);
 #define LOG_DEBUG(fmt,...) _printf(fmt,##__VA_ARGS__)
 #endif
 
-#if CONFIG_CI_LOG_EN
+#if CONFIG_CI_LOG_EN && !SDK_RELEASE_EN
 /*need open SecureCRT ansi color*/
 #define CI_LOG(debug, comlevel, message, args...)                                          \
     do {                                                                                   \

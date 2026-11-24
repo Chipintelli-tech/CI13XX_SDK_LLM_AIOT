@@ -151,20 +151,8 @@ int32_t post_read_flash(char *buf, uint32_t addr, uint32_t size)
     {
         addr -= FLASH_CPU_READ_BASE_ADDR;
     }
-    // mprintf("buf:0x%x, addr:0x%x, size = %d\n", buf, addr, size);
-
-#if 0 
-    //解决卡死问题
-    if(addr & 3)
-    {
-        uint32_t read_size = 4 - (addr & 3);
-        memcpy(tmp, FLASH_CPU_READ_BASE_ADDR + (addr & (~0x3)) - 1, read_size + 1);
-    }
-    memcpy(buf, FLASH_CPU_READ_BASE_ADDR + addr, size);
-#else
-    
     xip_read_flash(buf,FLASH_CPU_READ_BASE_ADDR+addr,size);
-#endif
+
     give_flash_sem();
     return RETURN_OK;
 }

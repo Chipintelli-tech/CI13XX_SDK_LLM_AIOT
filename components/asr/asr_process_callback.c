@@ -18,17 +18,14 @@
 #include "platform_config.h"
 #include "ci_log_config.h"
 #include "asr_process_callback.h"
-//#include "system_msg_deal.h"
-// #include "voiceprint_port.h"
-
 #include "ci_log.h"
 #include "status_share.h"
 
 #define DEBUG_ASR_NOT_PLAY (0)
 
 
-#if USE_AI_DOA 
-#include "ci_ai_doa_init_param.h"
+#if USE_NN_DOA 
+#include "ci_nn_doa_init_param.h"
 #endif
 #if USE_PWK
 #include "ci_pwk.h"
@@ -43,7 +40,6 @@ int set_pcm_vad_mark_flag(short *pcm_data,int frame_len)
     static int vad_end_marked = 0;
     
     status_t vad_state = ciss_get(CI_SS_VAD_STATE);//asr_vad 获取vad_start时刻
-    //mprintf("vad_state = %d\n",vad_state);
     if((CI_SS_VAD_START == vad_state)&&(0 == vad_start_marked))
     {
         vad_start_marked = 1;
@@ -156,11 +152,6 @@ void vad_result_close_file(void)
 *******************************************************************************/
 int vadstart_callback(unsigned int *pdata, int line)
 {
-#if 0//USE_AI_DOA
-    doa_nn_param_t *pdoa_param = get_ci_ai_doa_param();
-    pdoa_param->vad_end_flag = 0;
-    pdoa_param->vad_start_flag = 1;
-#endif
 #if USE_PWK
     pwk_param_t *ppwk_param = get_ci_pwk_param();
     ppwk_param->vad_end_flag = 0;
@@ -194,8 +185,8 @@ extern void vad_light_off(void);
 int vadend_callback(unsigned int *pdata, int line)
 {
     // vad_light_off();
-#if 0//USE_AI_DOA   
-    doa_nn_param_t *pdoa_param = get_ci_ai_doa_param();
+#if USE_NN_DOA   
+    nn_doa_param_t *pdoa_param = get_nn_doa_param();
     pdoa_param->vad_end_flag = 1;
     pdoa_param->vad_start_flag = 0;
 #endif

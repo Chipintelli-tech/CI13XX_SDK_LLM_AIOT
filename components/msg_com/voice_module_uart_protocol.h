@@ -40,8 +40,6 @@ typedef struct
     /*uint16_t chksum; send add auto*/
     /*uint8_t tail; send add auto*/
 }sys_msg_com_data_t;
-
-
 #pragma pack()
 
 /*header*/
@@ -59,7 +57,7 @@ typedef struct
 #define VMUP_MSG_TYPE_CMD_DOWN (0xA1)
 #define VMUP_MSG_TYPE_ACK      (0xA2)
 #define VMUP_MSG_TYPE_NOTIFY   (0xA3)
-#if USE_IR_ENABEL
+#if USE_IR_ENABLE
 #define VMUP_MSG_TYPE_TEST     (0xA4)
 #endif
 

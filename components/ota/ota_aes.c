@@ -17,29 +17,3 @@ uint32_t ota_aes_info_addr_func(void)
     return 0x3000;
 #endif
 }
-#if 0
-void ota_aes_msg_check(void)
-{
-#if CI_OTA_ENABLE
-    //写ota信息标志位
-    cias_ota_flag_t cias_ota_flag_read = {0};
-    post_read_flash((char *)&cias_ota_flag_read,CIAS_FLASH_IMAGE_UPGRADE_FLAG_ADDR,sizeof(cias_ota_flag_read));
-    if((cias_ota_flag_read.cias_ota_chip_type != CI_CHIP_TYPE) 
-        || (cias_ota_flag_read.cias_ota_uart_port != CI_OTA_UART_NUMBER)
-        || (cias_ota_flag_read.cias_ota_baud != CI_OTA_UART_BAUD))
-    {
-        cias_ota_flag_t cias_ota_flag = {0};
-        cias_ota_flag.cias_ota_chip_type = CI_CHIP_TYPE;
-        cias_ota_flag.cias_ota_uart_port = CI_OTA_UART_NUMBER;
-        cias_ota_flag.cias_ota_baud = CI_OTA_UART_BAUD;
-        post_erase_flash(CIAS_FLASH_IMAGE_UPGRADE_FLAG_ADDR,4096);
-        post_write_flash((char *)&cias_ota_flag,CIAS_FLASH_IMAGE_UPGRADE_FLAG_ADDR,sizeof(cias_ota_flag));
-        post_read_flash((char *)&cias_ota_flag_read,CIAS_FLASH_IMAGE_UPGRADE_FLAG_ADDR,sizeof(cias_ota_flag_read));
-        if(RETURN_ERR == flash_init(QSPI0, ENABLE))
-        {
-            mprintf("flash reinit error\n");
-        }
-    }
-#endif
-}
-#endif

@@ -7,7 +7,7 @@
 #include "ci130x_codec.h"
 
 
-#define MAX_CODEC_NUM                   2
+#define MAX_CODEC_NUM                   3
 
 
 typedef struct codec_hw_info_str cm_codec_hw_info_t;

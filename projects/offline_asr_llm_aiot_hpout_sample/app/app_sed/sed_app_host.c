@@ -3,7 +3,11 @@
 #include "sed_manage.h"
 #include "sed_app_host.h"
 #include "prompt_player.h"
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
 #include "audio_play_process.h"
+#else
+#include "simple_audio_player.h"
+#endif
 #include "ci130x_gpio.h"
 #include "FreeRTOS.h"
 #include "system_msg_deal.h"
@@ -13,13 +17,13 @@
 #if USE_SED
 
 #if USE_SED_CRY
-const sed_param_config_t sed_config_para = 
+const sed_param_config_t g_sed_config_para = 
 {
 	.threshold = THRESHOLD_CRY,
 	.times = TIMES_CRY
 };
 #elif USE_SED_SNORE
-const sed_param_config_t sed_config_para = 
+const sed_param_config_t g_sed_config_para = 
 {
 	.threshold = THRESHOLD_SNORE,
 	.times = TIMES_SNORE
@@ -35,11 +39,11 @@ static bool sed_relt_flag = false;
 
 bool sed_continuous_detect(float out_array)
 {  
-    float thr = sed_config_para.threshold;
+    float thr = g_sed_config_para.threshold;
 #if USE_SED_CRY
-    if(sed_config_para.times <= TIMES_CRY)
+    if(g_sed_config_para.times <= TIMES_CRY)
 #elif USE_SED_SNORE
-    if(sed_config_para.times <= TIMES_SNORE)
+    if(g_sed_config_para.times <= TIMES_SNORE)
 #endif
     {
         times ++ ;
@@ -51,7 +55,7 @@ bool sed_continuous_detect(float out_array)
         {
             out_flag--;
         }
-        if(times == sed_config_para.times )
+        if(times == g_sed_config_para.times )
         {
             if (out_flag > 0)
             {
@@ -153,8 +157,13 @@ extern SedSnoreCloudCmdProtocolTypedef gSedSnoreCloudCmdProtocol;
 #endif
 void sed_rslt_out(void)
 {
+#if SIMPLE_AUDIO_PLAYER_ENABLE
+    uint32_t state = sap_get_state();
+    if (SAP_STATE_IDLE == state)
+#else
     uint32_t state = get_audio_play_state();
     if (AUDIO_PLAY_STATE_IDLE == state)
+#endif
     {
         sed_relt_flag = 0;
 

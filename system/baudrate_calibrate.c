@@ -122,7 +122,7 @@ void task_baudrate_calibrate(void *p_arg)
                 bc_info.up_index = bc_info.old_baudrate_index;
                 bc_info.down_index = bc_info.old_baudrate_index;
                 memset(bc_info.test_flag, 0, FACTOR_NUM*sizeof(bc_info.test_flag[0]));
-                mprintf("send @ index:%d\n", bc_info.old_baudrate_index);
+                ci_logdebug(LOG_SYS_INFO, "send @ index:%d\n", bc_info.old_baudrate_index);
             }
             break;
         case BC_STOP:
@@ -174,7 +174,7 @@ void task_baudrate_calibrate(void *p_arg)
                             sys_power_on_hook();
                         }
                     }
-                    mprintf("keep baudrate %d\n", (uint32_t)(bc_info.std_baudrate*factors[bc_info.old_baudrate_index]));
+                    ci_logdebug(LOG_SYS_INFO, "keep baudrate %d\n", (uint32_t)(bc_info.std_baudrate*factors[bc_info.old_baudrate_index]));
                 }
                 else
                 {
@@ -236,7 +236,7 @@ void task_baudrate_calibrate(void *p_arg)
             }
             UARTInterruptConfig(bc_info.UARTx, bc_info.std_baudrate*factors[bc_info.factor_index]);
             bc_info.status = BC_SEND_REQ;
-            mprintf("send @ index:%d\n", bc_info.factor_index);
+            ci_logdebug(LOG_SYS_INFO, "send @ index:%d\n", bc_info.factor_index);
             break;
         case BC_CALC:
         {
@@ -297,12 +297,12 @@ void task_baudrate_calibrate(void *p_arg)
                 UARTInterruptConfig(bc_info.UARTx, bc_info.std_baudrate*factors[bc_info.factor_index]);
                 bc_info.old_baudrate_index = bc_info.factor_index;
                 bc_info.sync_interval = BAUDRATE_SYNC_PERIOD;
-                mprintf("change baudrate to %d\n", (uint32_t)(bc_info.std_baudrate*factors[bc_info.factor_index]));
+                ci_logdebug(LOG_SYS_INFO, "change baudrate to %d\n", (uint32_t)(bc_info.std_baudrate*factors[bc_info.factor_index]));
             }
             else
             {
                 UARTInterruptConfig(bc_info.UARTx, bc_info.std_baudrate*factors[bc_info.old_baudrate_index]);
-                mprintf("keep baudrate %d\n", (uint32_t)(bc_info.std_baudrate*factors[bc_info.old_baudrate_index]));
+                ci_logdebug(LOG_SYS_INFO, "keep baudrate %d\n", (uint32_t)(bc_info.std_baudrate*factors[bc_info.old_baudrate_index]));
                 bc_info.sync_interval = BAUDRATE_FAST_SYNC_PERIOD;
             }
             

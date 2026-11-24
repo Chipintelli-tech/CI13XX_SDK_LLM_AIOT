@@ -497,7 +497,11 @@ void inner_codec_set_pga_gain(inner_codec_cha_sel_t cha,int32_t ALC_Gain)
 #define ALC_NOISE_GATE  INNER_CODEC_GATE_DISABLE
 #define ALC_NOISE_GATE_SET  INNER_CODEC_NOISE_GATE_THRE_45dB
 #define ALC_INIT_PGA_GAIN   0x1f
+#if INNER_CODEC_AUDIO_IN_USE_RESAMPLE
+#define ALC_SAMPLE_RATE     INNER_CODEC_SAMPLERATE_32K
+#else
 #define ALC_SAMPLE_RATE     INNER_CODEC_SAMPLERATE_16K
+#endif
 #define ALC_LOW_8_BIT_MAX_LEVEL     ((uint8_t)(INNER_CODEC_ALC_LEVEL__6dB >> 0))
 #define ALC_HOGH_8_BIT_MAX_LEVEL    ((uint8_t)(INNER_CODEC_ALC_LEVEL__6dB >> 8))
 #define ALC_LOW_8_BIT_MIN_LEVEL     ((uint8_t)(INNER_CODEC_ALC_LEVEL__7_5dB >> 0))
@@ -586,42 +590,45 @@ int icodec_init(cm_codec_hw_info_t * codec_hw_info)
     inner_codec_i2s_data_famat_t codec_adc_df[] = {INNER_CODEC_I2S_DATA_FORMAT_I2S_MODE,
                                         INNER_CODEC_I2S_DATA_FORMAT_LJ_MODE,
                                         INNER_CODEC_I2S_DATA_FORMAT_RJ_MODE};
-    #if (!AUDIO_IN_FROM_DMIC)
-    inner_codec_adc_config_t CODEC_ADC_Config_Struct;
+    #if (!AUDIO_IN_FROM_DMIC || REF_IN_FROM_INNER_CODEC)
+    if(codec_hw_info->input_iis.IISx != IIS2)
+    {
+        inner_codec_adc_config_t CODEC_ADC_Config_Struct;
 
-    CODEC_ADC_Config_Struct.codec_adc_input_mode_l = codec_hw_info->codec_gain.codec_adc_input_mode_l;
-    CODEC_ADC_Config_Struct.codec_adc_input_mode_r = codec_hw_info->codec_gain.codec_adc_input_mode_r;
-    
-    CODEC_ADC_Config_Struct.codec_adc_mic_amp_l = codec_hw_info->codec_gain.codec_adc_mic_amp_l;
-    CODEC_ADC_Config_Struct.codec_adc_mic_amp_r = codec_hw_info->codec_gain.codec_adc_mic_amp_r;
+        CODEC_ADC_Config_Struct.codec_adc_input_mode_l = codec_hw_info->codec_gain.codec_adc_input_mode_l;
+        CODEC_ADC_Config_Struct.codec_adc_input_mode_r = codec_hw_info->codec_gain.codec_adc_input_mode_r;
 
-    //如果不使能ALC，PGA的增益设置
-    CODEC_ADC_Config_Struct.pga_gain_l = codec_hw_info->codec_gain.pga_gain_l;
-    CODEC_ADC_Config_Struct.pga_gain_r = codec_hw_info->codec_gain.pga_gain_r;
-    //ADC初始化
-    inner_codec_adc_enable(&CODEC_ADC_Config_Struct);
+        CODEC_ADC_Config_Struct.codec_adc_mic_amp_l = codec_hw_info->codec_gain.codec_adc_mic_amp_l;
+        CODEC_ADC_Config_Struct.codec_adc_mic_amp_r = codec_hw_info->codec_gain.codec_adc_mic_amp_r;
 
-    //ADC增益设置
+        //如果不使能ALC，PGA的增益设置
+        CODEC_ADC_Config_Struct.pga_gain_l = codec_hw_info->codec_gain.pga_gain_l;
+        CODEC_ADC_Config_Struct.pga_gain_r = codec_hw_info->codec_gain.pga_gain_r;
+        //ADC初始化
+        inner_codec_adc_enable(&CODEC_ADC_Config_Struct);
 
-    
-    CODEC->reg3 &= ~(0x03 << 4)  | (0x03 << 2);
-    CODEC->reg3 |= (code_mode[codec_hw_info->input_iis.iis_mode_sel] << 4) | (INNER_CODEC_FRAME_LEN_32BIT << 2);
+        //ADC增益设置
 
-    CODEC->reg2 &= ~(0x03 << 3);
-    CODEC->reg2 |= codec_adc_df[codec_hw_info->input_iis.iis_data_format] << 3;
 
-    //滤波器设置
-    inner_codec_hp_filter_config(INNER_CODEC_GATE_ENABLE, INNER_CODEC_HIGHPASS_CUT_OFF_20HZ);
-    inner_codec_lp_filter_sel(INNER_CODEC_LP_FILTER_IIR);
-    inner_codec_alc_judge_sel(INNER_CODEC_ALC_JUDGE_AFTER_HIGHPASS);
-    CODEC->rega = (LPF_CONFIG << 7) | (ALC_JUDGE << 6) | (ALC_CONTROL_PGA_L << 5) 
-            | (ALC_CONTROL_PGA_R << 4) | (1 << 3) | (HPF_GATE << 2) | (HPF_CONFIG << 0);
+        CODEC->reg3 &= ~(0x03 << 4)  | (0x03 << 2);
+        CODEC->reg3 |= (code_mode[codec_hw_info->input_iis.iis_mode_sel] << 4) | (INNER_CODEC_FRAME_LEN_32BIT << 2);
 
-    //ALC设置
-    alc_init_config();
+        CODEC->reg2 &= ~(0x03 << 3);
+        CODEC->reg2 |= codec_adc_df[codec_hw_info->input_iis.iis_data_format] << 3;
 
-    inner_codec_adc_dig_gain_set(INNER_CODEC_LEFT_CHA,(int)(codec_hw_info->codec_gain.dig_gain_l));
-    inner_codec_adc_dig_gain_set(INNER_CODEC_RIGHT_CHA,(int)(codec_hw_info->codec_gain.dig_gain_r));
+        //滤波器设置
+        inner_codec_hp_filter_config(INNER_CODEC_GATE_ENABLE, INNER_CODEC_HIGHPASS_CUT_OFF_20HZ);
+        inner_codec_lp_filter_sel(INNER_CODEC_LP_FILTER_IIR);
+        inner_codec_alc_judge_sel(INNER_CODEC_ALC_JUDGE_AFTER_HIGHPASS);
+        CODEC->rega = (LPF_CONFIG << 7) | (ALC_JUDGE << 6) | (ALC_CONTROL_PGA_L << 5) 
+                | (ALC_CONTROL_PGA_R << 4) | (1 << 3) | (HPF_GATE << 2) | (HPF_CONFIG << 0);
+
+        //ALC设置
+        alc_init_config();
+
+        inner_codec_adc_dig_gain_set(INNER_CODEC_LEFT_CHA,(int)(codec_hw_info->codec_gain.dig_gain_l));
+        inner_codec_adc_dig_gain_set(INNER_CODEC_RIGHT_CHA,(int)(codec_hw_info->codec_gain.dig_gain_r));
+    }
     #endif
 
     //DAC设置

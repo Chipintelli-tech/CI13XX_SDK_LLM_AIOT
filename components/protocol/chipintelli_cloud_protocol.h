@@ -73,7 +73,7 @@ typedef struct
 }SedSnoreCloudCmdProtocolTypedef;
 #endif
 
-#if USE_AI_DOA
+#if USE_NN_DOA
 typedef enum
 {
     DOA_CHECKED_ANGLE_0 = 0,          //检测到0度

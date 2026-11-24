@@ -94,10 +94,10 @@ typedef enum{
 	SET_VAD_FILTER_FRAME                =  0x010F,  /*过滤vad start和end之间帧数(16ms一帧)，小于该设定值被判断为无效语音，语音芯片不上传, 带参数2字节*/
 	SET_VAD_SENSITIVITY_ACTIVATE_LENTH  =  0x0110,  /*多长时间的静音产生vad end，带参数1字节*/
 	SET_VAD_START_MAX_TIMEOUT           =  0x0111,  /*设置vad start 最大时间，超过设置时间则强制结束上传语音，单位秒，默认5S，带参数2字节*/  
-    SET_PLAY_VOICE_ID                   =  0x0112,  /*设置离线播放音频，带参数4字节(id号)*/ 
+    SET_PLAY_VOICE_ID                   =  0x0112,  /*设置离线播放音频，带参数3字节(id号 + 是否打断)*/ 
     SET_WAKE_UP_CONTINUE_TIME           =  0x0113,  /*设置持续唤醒时间，超过设置时间，语音芯片强制退出唤醒，带参数2字节(默认15S)*/
     SET_ENTER_WAKE_UP                   =  0x0114,  /*通过指令让语音芯片进入唤醒状态，不用等待唤醒词唤醒*/
-    SET_INTERACTION_NULTI_ROUND_ENABLE =  0x0115,  /*设置单轮还是多轮，带参数1字节，0-单轮 1-多轮(默认)*/
+    SET_INTERACTION_NULTI_ROUND_ENABLE  =  0x0115,  /*设置单轮还是多轮，带参数1字节，0-单轮 1-多轮(默认)*/
     UPLOAD_PLAY_FULL_DUPLEX_EANBLE      =  0x0116,  /*设置播放音频时是否上传录音，带参数1字节 0-不上传(默认) 1-上传*/
     SET_AUDIO_VOLUME                    =  0x0117,  /*设置语音芯片音量，带参数1字节，范围(1-7), 默认7*/
     SET_AUDIO_COMPRESS_TYPE             =  0x0118,  /*压缩类型，默认只支持speex压缩，预留，暂时不做支持*/
@@ -106,6 +106,7 @@ typedef enum{
     SET_AUDIO_STOP_RECORD               =  0x011B,   /*通过指令结束录音(和SET_AUDIO_START_RECORD必须配对使用)*/
     SET_CLOUD_ANS_TIMEOUT_EXIT          =  0x011C,   /*设置退出云端响应超时*/
 	SET_FORCE_VAD_END                   =  0x011D,   /*强制设置VAD结束*/   
+    VAD_VAILD_CHECK_RESULT              =  0x011E,   /*NN_VAD后置有效性检查结果：0-无效语音 1-有效语音*/ 
     //网络播放相关
     NET_PLAY_START                      =  0x0201,   /*开始播放 */
     NET_PLAY_PAUSE                      =  0x0202,   /*播放暂停 */
@@ -144,6 +145,7 @@ typedef enum{
     IOT_VOLUME_MUTE                     =  0x0309,    // 云端音量静音
     IOT_VOLUME_UNMUTE                   =  0x030a,   // 云端音量取消静音
     IOT_QUITE_WAKE_UP_MODE              =  0x030b,   // 退出唤醒模式
+    GET_SW_VERSION                      =  0x030d,   // 获取软件版本信息
     //网络相关
     ENTER_NET_CONFIG                    =  0x0401,   //进入配网模式
     NET_CONFIGING                       =  0x0402,   //配网中
@@ -180,7 +182,9 @@ typedef enum{
     CIAS_FACTORY_TEST_REAL_VAL_MICR      = 0x0512,       //MICR生产通路测试过程中实时值上传
     CIAS_FACTORY_TEST_REAL_VAL_REFL      = 0x0513,       //REFL生产通路测试过程中实时值上传
     CIAS_FACTORY_TEST_REAL_VAL_REFR      = 0x0514,       //REFR生产通路测试过程中实时值上传
-
+	CIAS_AEC_GET_MIC_REF_GAIN            = 0x0515,       /*开始自动获取最佳MIC REF增益*/
+    CIAS_AEC_GAIN_RESULT                 = 0x0516,       /*获取最佳MIC REF增益结果*/
+    
     //语音系统相关
     CIAS_AUDIO_SYS_READY                = 0x0601,       //语音系统ready
     CIAS_AUDIO_SYS_ERR                  = 0x0602,       //语音系统异常 

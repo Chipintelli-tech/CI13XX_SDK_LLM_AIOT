@@ -6,4 +6,5 @@
 
 extern int nlp_module_init(void);
 void nlp_result(nlp_data_t res, short is_wake_words, int cmd_words_cfd[4]);
+void nlp_intents_sort(nlp_data_t *res);
 #endif

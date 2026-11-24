@@ -9,9 +9,11 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-
-#define CI_BUFFER_MAG_PRINT_ENABLE  (0)//debug的打印
-
+#if SDK_RELEASE_EN
+#define CI_BUFFER_MAG_PRINT_ENABLE  (0)//必须关闭
+#else
+#define CI_BUFFER_MAG_PRINT_ENABLE  (1)//debug的打印
+#endif
 
 /**************************************************************************
                     typedef
@@ -302,10 +304,6 @@ uint32_t ci_buffer_get_read_ptr(buffer_manage_t* buffer_info_p,uint16_t frm_num,
     //写的buffer是第多少个
     uint32_t buffer_num = (read_ptr - buffer_info_p->buffer_start_addr) / buffer_info_p->read_frm_size;
     mprintf("get read_ptr[0x%x] = [%d] 0x%x\n",buffer_info_p->buffer_id,buffer_num,read_ptr);
-    #endif
-
-    #if CI_BUFFER_MAG_PRINT_ENABLE
-    // mprintf("next read_ptr[0x%x] = 0x%x\n",buffer_info_p->buffer_id,buffer_info_p->read_ptr);
     #endif
 
     ci_buffer_manage_exit_critcal();

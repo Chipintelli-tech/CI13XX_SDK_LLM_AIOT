@@ -9,7 +9,6 @@
 #include "cias_network_msg_protocol.h"
 #include "codec_manager.h"
 #include "ci_assert.h"
-#include "cias_demo_config.h"
 #include "cias_common.h"
 #include "cias_voice_upload.h"
 #include "status_share.h"
@@ -665,7 +664,7 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         gCiasAiotRunParam.request_play_try_count = 0; // 清除超时参数
 #if	SIMPLE_AUDIO_PLAYER_ENABLE
         if (!gCiasAiotRunParam.play_cloud_end_flag && (gCiasAiotRunParam.cloud_play_state != CLOUD_PLAYING_DATA_WITING_TIMEOUT 
-            &&gCiasAiotRunParam.cloud_play_state != CLOUD_PLAY_END))
+            && gCiasAiotRunParam.cloud_play_state != CLOUD_PLAY_END))
 #else
         if (!gCiasAiotRunParam.play_cloud_end_flag)
 #endif
@@ -770,7 +769,7 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         xStreamBufferReset(gCiasAiotRunParam.pcm_play_data_stream_buffer);
 #endif
 #endif
-        ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE); // 设置播放结束
+        ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE); // 设置播放结束
         if (!gCiasAiotFuncParam.upload_play_full_duplex)
         {
             ciss_set(CI_SS_VOX_WORK_STATE, 1); // 开启vox vad计算
@@ -868,6 +867,35 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
     case CIAS_AUDIO_RST:
         dpmu_software_reset_system_config();
         break;
+#if AUTO_GET_AEC_GAIN
+    case CIAS_AEC_GET_MIC_REF_GAIN:
+        mprintf("enter CIAS_AEC_GET_MIC_REF_GAIN!!!\r\n");
+        if (pheader->len == 2)
+        {
+            gCiasAiotFuncParam.aec_gain_get_state = GET_AEC_GAIN_MIC;
+
+            if((int8_t)msg_buf[msg_offset] <= 28 && (int8_t)msg_buf[msg_offset] >= -18)
+            gCiasAiotFuncParam.aec_min_mic_gain = (int8_t)msg_buf[msg_offset];
+            else
+            gCiasAiotFuncParam.aec_min_mic_gain = DEFAULT_MIN_MIC_GAIN;
+
+            if(msg_buf[msg_offset+1] <= VOLUME_MAX && msg_buf[msg_offset+1] >= VOLUME_MIN)
+            vol_set(msg_buf[msg_offset+1]);
+            else
+            vol_set(DEFAULT_EXPECT_VOLUM);
+
+            mprintf("aec_min_mic_gain set = %d\r\n", gCiasAiotFuncParam.aec_min_mic_gain);
+            mprintf("vol set = %d\r\n", msg_buf[msg_offset+1]);
+            xTimerStop(gCiasAiotRunParam.cloud_ans_count_timer, 0);//本地识别到则停止云端超时
+            // pause_asr(0, 1);
+            prompt_play_by_voice_id(GET_AEC_GAIN_AUDIO_ID, NULL, true);  //播放测试音频
+        }
+        else
+        {
+            goto PARSE_WIFI_MSG_ERR;
+        }
+        break;
+#endif
     case CIAS_GET_SOFT_VER:
     {
         product_version_t fw_version;

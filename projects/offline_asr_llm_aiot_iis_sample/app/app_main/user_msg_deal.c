@@ -13,7 +13,6 @@
 #include "ci130x_dpmu.h"
 #include "user_msg_deal.h"
 #include "cias_network_msg_protocol.h"
-#include "cias_demo_config.h"
 #include "cias_voice_upload.h"
 #include "cias_aiot_protocol.h"
 // #include "all_cmd_statement.h"
@@ -404,7 +403,7 @@ void userapp_initial(void)
     #if MSG_USE_I2C_EN
     i2c_communicate_init();
     #endif
-    #if USE_IR_ENABEL   //红外任务初始化
+    #if USE_IR_ENABLE   //红外任务初始化
     ir_task_init(); 
     get_flash_eut_state();   //获取下自动测试状态
     xTaskCreate(DeviceTaskProcess, "DeviceTaskProcess", 300, NULL, 4, NULL);
@@ -477,11 +476,7 @@ uint32_t deal_asr_msg_by_semantic_id(sys_msg_asr_data_t *asr_msg, cmd_handle_t c
         if (ret)
         {
             #if PLAY_OTHER_CMD_EN && !WMAN_PLAY_EN
-            #if MULT_INTENT > 1
-            prompt_play_by_cmd_handle(cmd_handle, select_index, default_play_done_callback,false);
-            #else
             prompt_play_by_cmd_handle(cmd_handle, select_index, default_play_done_callback,true);
-            #endif
             #endif
         }
     }
@@ -514,32 +509,29 @@ uint32_t deal_asr_msg_by_cmd_id(sys_msg_asr_data_t *asr_msg, cmd_handle_t cmd_ha
     mprintf("---cmd_id = %d\r\n", cmd_id);
     switch (cmd_id)
     {
-    case 103:
-        mprintf("start config net....\r\n");
-        break;
-    case 3: // 增大音量
+    case 101: // 增大音量
         mprintf("set vol add..\r\n");
         vol = vol_set(vol_get() + 1);
         select_index = (vol == VOLUME_MAX) ? 1 : 0;
         break;
-    case 4: // 减小音量
+    case 102: // 减小音量
         mprintf("set vol sub..\r\n");
         vol = vol_set(vol_get() - 1);
         select_index = (vol == VOLUME_MIN) ? 1 : 0;
         break;
-    case 5: // 最大音量
+    case 103: // 最大音量
         mprintf("set vol max..\r\n");
         vol_set(VOLUME_MAX);
         break;
-    case 6: // 最小音量
+    case 104: // 最小音量
         mprintf("set vol min..\r\n");
         vol_set(VOLUME_MIN);
         break;
-    case 9:
+    case 105:
         mprintf("set interaction_multi_round 1\r\n");
         gCiasAiotFuncParam.interaction_multi_round = 1;
         break;
-    case 10:
+    case 106:
         mprintf("set interaction_multi_round 0\r\n");
         gCiasAiotFuncParam.interaction_multi_round = 0;
         break;
@@ -563,11 +555,7 @@ uint32_t deal_asr_msg_by_cmd_id(sys_msg_asr_data_t *asr_msg, cmd_handle_t cmd_ha
     if (ret && select_index >= -1)
     {
         #if PLAY_OTHER_CMD_EN && !WMAN_PLAY_EN
-        #if MULT_INTENT > 1
-        prompt_play_by_cmd_handle(cmd_handle, select_index, default_play_done_callback,false);
-        #else
         prompt_play_by_cmd_handle(cmd_handle, select_index, default_play_done_callback,true);
-        #endif
         #endif
     }
 

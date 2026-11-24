@@ -6,11 +6,6 @@
 #define HPF_CUT_OFF_FREQ (1) //fft_hpf的截止频率31.25*HPF_CUT_OFF_FREQ
 typedef struct
 {
-    float real;
-    float image;
-} Complex;
-typedef struct
-{
     bool alg_enable;
     //初始化参数
     int sample_frequency;          //采样率
@@ -19,8 +14,7 @@ typedef struct
     int fft_frm_size;              //fft输入有效长度的点数
     int fft_size;                  //fft的正频分量点数+直流分量点数
     int result_out_channel;        //ifft输出通道数
-    
-    int psd_compute_channel_num; //计算psd通道数；
+    int psd_compute_channel_num;   //计算psd通道数；
     bool time_pre_emphasis_enable; //是否进行时域预加重，16k采样率时使用，32k采样率使用频域的预加重。
     bool downsampled_enable;       //是否进行32k-16k降采样处理
     bool fe_psd_enable;            //是否计算psd，以计算特征
@@ -77,6 +71,7 @@ typedef struct
     riscv_rfft_fast_instance_f32 S;
     ci_ahs_s* ahs_st;
     float cur_aec_ref_eng;
+    float noise_log_energy;
 } ci_wrapfft_audio;
 
 #ifdef __cplusplus

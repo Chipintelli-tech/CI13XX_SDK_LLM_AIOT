@@ -32,7 +32,7 @@
 #define MSG_HEAD_S 0xa5
 #define MSG_HEAD_E 0x0f
 #define MSG_HEAD 0x0FA5
-#define MSG_TAIL 0xFF
+#define MSG_OTA_TAIL 0xFF
 
 #define SRAM_START_ADDR         0x1FFB0000
 #define MAX_SRAM_CODE_SIZE      (1024*(480-32))
@@ -316,7 +316,7 @@ void receive_func(uint8_t receive_char)
             }
             break;
         case STATE_TAIL:
-            if(receive_char == MSG_TAIL)
+            if(receive_char == MSG_OTA_TAIL)
             {
                 p_recv_buffer->message.msg_tail = receive_char;
                 append_buffer(&full_buffer_chain, p_recv_buffer);
@@ -533,7 +533,7 @@ void make_packet(uint8_t type, uint8_t cmd, uint8_t number, uint8_t *data, uint1
     Send_Box->number = number;
     Send_Box->data = data;
     Send_Box->crc = crc_func(crc_func(0,&Send_Box->type,3),Send_Box->data,Send_Box->length);
-    Send_Box->msg_tail = MSG_TAIL;
+    Send_Box->msg_tail = MSG_OTA_TAIL;
 }
 
 

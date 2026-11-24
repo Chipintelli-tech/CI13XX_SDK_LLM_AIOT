@@ -20,15 +20,11 @@
 extern "C"
 {
 #endif
-
   int32_t audio_in_buffer_init(void);
-
   int32_t audio_in_hw_straight_mode_init(void);
-
   void audio_in_preprocess_mode_task(void *p);
-
   void audio_in_rpmsg_init(void);
-
+  bool get_audio_queue_space_is_enough(void);
 #ifdef __cplusplus
 }
 #endif

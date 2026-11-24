@@ -13,6 +13,13 @@ typedef enum
     CLOUD_PLAYING_DATA_WITING_TIMEOUT,      /*!< 云端播放中数据等待超时 */
     CLOUD_PLAY_END,                         /*!< 云端播放结束 */
 }cloud_play_state;
+typedef enum
+{
+    GET_AEC_GAIN_IDLE,                    /*!< 空闲 */
+    GET_AEC_GAIN_MIC,                     /*!< 开始获取MIC增益和speak 增益 */
+    GET_AEC_GAIN_REF,                     /*!< 开始获取REF增益 */
+    GET_AEC_GAIN_REF_THR,                 /*!< 开始获取REF阈值 */
+}aec_gain_state;
 
 typedef struct
 {
@@ -86,6 +93,10 @@ typedef struct
     bool     upload_audio_by_denoise;               //上传音频是否带降噪
     uint8_t  is_play_exit_wakeup_voice;             /*是否带播报音退出唤醒*/
     bool  is_play_enter_wakeup_voice;               /*是否带播报音进入唤醒*/
+#if AUTO_GET_AEC_GAIN
+    aec_gain_state  aec_gain_get_state;             /*获取增益状态*/
+    int8_t   aec_min_mic_gain;                   /*最小mic增益*/
+#endif
 #if IIS_CHANNEL_ENG_CALC_EANBLE
     bool     upload_factory_test_real_val_flag;     /*上传生产过程中的事实值*/  
     bool     factory_test_is_busying;               //生产测试中

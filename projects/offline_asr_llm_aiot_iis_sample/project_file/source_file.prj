@@ -71,9 +71,6 @@ source-file: components/ci_nvdm/ci_nvdata_port.c
 source-file: components/cmd_info/command_file_reader.c
 source-file: components/cmd_info/command_info.c
 source-file: components/cmd_info/prompt_player.c
-//source-file: components/audio_in_manage/iis_master_rx.c
-//source-file: components/audio_in_manage/iis_slave.c
-//source-file: components/audio_in_manage/audio_in_manage.c
 source-file: components/audio_in_manage/audio_in_manage_inner.c
 
 
@@ -85,6 +82,7 @@ source-file: components/codec_manager/codec_manager.c
 source-file: components/codec_manager/codec_manage_inner_port.c
 
 source-file: components/protocol/chipintelli_cloud_protocol.c
+source-file: components/ci_common/ci_alg_common_api.c
 
 source-file: components/alg/vp_host/vp_nn_cmpt_port_host.c
 source-file: components/VPR/voice_print_recognition.c
@@ -92,8 +90,6 @@ source-file: components/VPR/voice_print_wman_recognition.c
 source-file: components/msg_com/voice_module_uart_protocol_g1.c
 source-file: components/msg_com/i2c_protocol_module.c
 source-file: components/msg_com/voice_module_uart_protocol.c
-source-file: components/msg_com/voice_module_uart_tts_protocol.c
-
 //factory ir_test
 source-file: components/factory_test/cias_factory_test.c
 
@@ -164,21 +160,17 @@ source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/ir_test_protoco
 
 
 
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_main/ci_nlp_user.c
+//source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_main/ci_nlp_user.c
 
 library-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/ir_src/libir_data.a
 
-
-library-file: $(LIBS_PATH)/libnlp.a 
-//library-file: $(LIBS_PATH)/libasr_v2.a 
 library-file: $(LIBS_PATH)/libnewlib_port.a 
 library-file: $(LIBS_PATH)/libfreertos_port.a
 library-file: $(LIBS_PATH)/libdsu.a
 library-file: $(LIBS_PATH)/libflash_encrypt.a
 library-file: $(LIBS_PATH)/libcwsl_v2.a
-library-file: $(LIBS_PATH)/libtts.a
-library-file: components/ci_ble/stack/libOnMicroBLE.a
-library-file: components/ci_ble/stack/libcias_crypto.a
+library-file: $(LIBS_PATH)/libbnpu_math.a
+library-file: $(LIBS_PATH)/libspeex.a
 source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_audio_handle/cias_audio_data_handle.c
 source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_audio_handle/cias_circle_queue.c
 source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_audio_handle/cias_network_msg_protocol.c
@@ -364,22 +356,9 @@ source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_audio_handle/cias_
 source-file: components/cias_g722/g722_decode.c
 source-file: components/cias_g722/g722_encode.c
 include-path:components//cias_g722/
-//ci_ble_demo
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/app_ble.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/rf_msg_deal.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/demo/cias_rgb_driver.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/demo/cias_rgb_msg_deal.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/demo/cias_fan_msg_deal.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/demo/cias_aircondition_msg_deal.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/demo/cias_warmer_msg_deal.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/demo/cias_heattable_msg_deal.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/demo/cias_tbm_msg_deal.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/demo/cias_waterheated_msg_deal.c
-include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_ble
-include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_ble/demo
+
 
 source-file:  components/cias_lib/cJSON.c
-include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_demo/
 include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_common
 include-path: components/cias_lib/
 
@@ -397,7 +376,8 @@ include-path: components/freertos/portable/GCC/N307
 include-path: components
 include-path: components/alg/vp_host
 include-path: components/VPR
-include-path: components/alg/ai_denoise
+include-path: components/alg/nn_denoise
+include-path: components/alg/tra_denoise
 include-path: components/asr
 include-path: components/asr/asr_top
 include-path: components/asr/asr_top/asr_top_inc
@@ -406,7 +386,6 @@ include-path: components/asr/vad_fe
 include-path: components/asr/vad_fe/vad_fe_inc
 include-path: components/asr/dnn
 include-path: components/asr/dnn/dnn_inc
-include-path: components/asr/cinn_v2/cinn_inc
 include-path: components/asr/npu/npu_inc
 include-path: components/asr/nn_and_flash
 include-path: components/asr/nn_and_flash/nn_and_flash_inc
@@ -444,6 +423,7 @@ include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_main
 include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_sed
 include-path: utils
 
+include-path: components/tvad
 include-path: components/alg
 include-path: components/alg/denoise
 include-path: components/alg/beamforming
@@ -451,11 +431,13 @@ include-path: components/alg/dereverb
 include-path: components/alg/alc_auto_switch
 include-path: components/alg/basic_alg
 include-path: components/alg/aec
-include-path: components/alg/doa
+include-path: components/alg/doa/nn_doa
+include-path: components/alg/doa/gcc_doa
 include-path: components/alg/sound_event_detection
 include-path: components/alg/agc
 include-path: components/aes/
 include-path: components/ota
+include-path: components/ci_common
 include-path: components/ci_cwsl_v2
 include-path: components/alg/pwk/
 include-path: components/ir_remote_driver
@@ -468,29 +450,5 @@ include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device
 include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/eut_test
 
 
-
-//stack
-source-file: components/ci_ble/app/exe_app_at.c
-source-file: components/ci_ble/app/exe_app_main.c
-source-file: components/ci_ble/app/exe_app_evt.c
-
-source-file: components/ci_ble/hal/ci_ble_spi.c
-source-file: components/ci_ble/hal/exe_adv_init.c
-source-file: components/ci_ble/hal/exe_hal_ci231x.c
-source-file: components/ci_ble/hal/exe_mcu_ci231x.c
-
-source-file: components/ci_ble/common/exe_profile_hid.c
-source-file: components/ci_ble/common/exe_stk_wrapper.c
-
-include-path: components/ci_ble/Inc/ble
-include-path: components/ci_ble/Inc/hal
-include-path: components/ci_ble/Inc
-include-path: components/ci_ble/hal
-include-path: components/ci_ble/stack
-
-include-path: components/tts
-include-path: components/tts/front_end3
-include-path: components/tts/vocoder
-include-path: components/tts/ringbuffer
-//factory_test
+//factory ir_test
 include-path: components/factory_test/

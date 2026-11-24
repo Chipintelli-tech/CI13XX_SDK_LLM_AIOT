@@ -355,7 +355,6 @@ void registe_gpio_callback(gpio_base_t base, gpio_irq_callback_list_t *gpio_irq_
 
 void GPIO_IRQ_Default_proc(gpio_base_t base, int gpio_port_index)
 {
-    static int gpio_status = 0;
 	call_irq_callback(&g_gpio_callback_list_root[gpio_port_index]);
 	for (int i = 0; i < 8; i++)
 	{

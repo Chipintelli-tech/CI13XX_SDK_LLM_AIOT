@@ -13,7 +13,7 @@
 #include "codec_manage_inner_port.h"
 #include "codec_manager.h"
 #include "audio_in_manage.h"
-// #include "asr_top_config.h"
+//#include "asr_top_config.h"
 #include "sdk_default_config.h"
 #include "ci130x_system_ept.h"
 #include "audio_in_manage_inner.h"
@@ -59,8 +59,8 @@ static void audio_in_iis_callback(void)
     {
         iis3_reg[i] = *(volatile uint32_t *)((uint32_t)IIS2 + 4 * i);
     }
-    // scu_set_device_reset((uint32_t)IIS2);
-    // scu_set_device_reset_release((uint32_t)IIS2);
+    //scu_set_device_reset((uint32_t)IIS2);
+    //scu_set_device_reset_release((uint32_t)IIS2);
     for (int i = 0; i < 7; i++)
     {
         *(volatile uint32_t *)((uint32_t)IIS2 + 4 * i) = iis3_reg[i];
@@ -119,13 +119,13 @@ void audio_deal_one_frm_callback(void *para)
 
 static get_fft_rslt_fun_t get_fft_rslt_fun_callback = NULL;
 
-// 设置的回调函数执行过程尽可能短！
+//设置的回调函数执行过程尽可能短！
 void set_get_fft_rslt_fun_callback(get_fft_rslt_fun_t fun)
 {
     get_fft_rslt_fun_callback = fun;
 }
 
-// 获取每帧语音的FFT数据的回调函数 示例
+//获取每帧语音的FFT数据的回调函数 示例
 void my_get_fft_rslt_fun(float *fft_rslt_p, int num)
 {
     mprintf("psd:\n");
@@ -137,14 +137,14 @@ void my_get_fft_rslt_fun(float *fft_rslt_p, int num)
 
 /**
  * @brief 获取每帧语音的FFT数据的回调函数（每16ms调用一次）,里面的执行过程一定要尽可能短
- *
- * @param para
+ * 
+ * @param para 
  */
 void deal_one_frm_fft_rslt_callback(void *para)
 {
     uint32_t *data = (uint32_t *)para;
-    float *psd_data = (float *)data[0]; // psd的地址
-    int psd_num = data[1];              // psd的个数
+    float *psd_data = (float *)data[0]; //psd的地址
+    int psd_num = data[1];              //psd的个数
     if (get_fft_rslt_fun_callback)
     {
         get_fft_rslt_fun_callback(psd_data, psd_num);
@@ -158,65 +158,69 @@ void is_open_voice_energy(bool gate, get_voice_energy_fun_t *fun)
     voice_energy_gate = gate;
     get_voice_energy_callback_fun = fun;
 }
-// 获取NN降噪模型地址
-void get_ci_ai_denoise_model_addr(void)
+//获取NN降噪模型地址
+uint32_t get_ci_nn_denoise_model_addr(void)
 {
-#if USE_DENOISE_NN
+#if USE_NN_DENOISE
     uint32_t addr;
     uint32_t size;
-    if (get_dnn_addr_by_id(CI_AI_DENOISE_MODEL_ID, &addr, &size))
+    if (get_dnn_addr_by_id(CI_NN_DENOISE_MODEL_ID, &addr, &size))
     {
-        ciss_set(CI_SS_AI_DENOISE_MODEL_ADDR, addr);
+        ciss_set(CI_SS_NN_DENOISE_MODEL_ADDR, addr);
     }
     else
     {
-        mprintf("mode id err, please verify mode id = %d\n", CI_AI_DENOISE_MODEL_ID);
+        mprintf("mode id err, please verify mode id = %d\n", CI_NN_DENOISE_MODEL_ID);
         CI_ASSERT(0, "\n");
     }
+    return addr;
 #endif
 }
-// 获取DOA模型地址
-void get_ci_ai_doa_model_addr(void)
+//获取NN DOA模型地址
+uint32_t get_ci_nn_doa_model_addr(void)
 {
-#if USE_AI_DOA
+#if USE_NN_DOA
     uint32_t addr;
     uint32_t size;
-    if (get_dnn_addr_by_id(CI_AI_DOA_MODEL_ID, &addr, &size))
+    if (get_dnn_addr_by_id(CI_NN_DOA_MODEL_ID, &addr, &size))
     {
-        ciss_set(CI_SS_AI_DOA_MODEL_ADDR, addr);
+        ciss_set(CI_SS_NN_DOA_MODEL_ADDR, addr);
     }
     else
     {
-        mprintf("mode id err, please verify mode id = %d\n", CI_AI_DOA_MODEL_ID);
+        mprintf("mode id err, please verify mode id = %d\n", CI_NN_DOA_MODEL_ID);
         CI_ASSERT(0, "\n");
     }
+    return addr;
 #endif
 }
-// 获取事件检测模型地址
+
+
+//获取事件检测模型地址
 void get_ci_sed_model_addr(void)
 {
 #if USE_SED
     uint32_t addr;
     uint32_t size;
 #if USE_SED_CRY
-    if (get_dnn_addr_by_id(CI_AI_CRY_MODEL_ID, &addr, &size))
+    if (get_dnn_addr_by_id(CI_NN_CRY_MODEL_ID, &addr, &size))
 #elif USE_SED_SNORE
-    if (get_dnn_addr_by_id(CI_AI_SNORE_MODEL_ID, &addr, &size))
+    if (get_dnn_addr_by_id(CI_NN_SNORE_MODEL_ID, &addr, &size))
 #endif
     {
         ciss_set(CI_SS_SED_MODEL_ADDR, addr);
     }
     else
     {
-        mprintf("mode id err, please verify mode id = %d/%d\n", CI_AI_CRY_MODEL_ID, CI_AI_SNORE_MODEL_ID);
+        mprintf("mode id err, please verify mode id = %d/%d\n", CI_NN_CRY_MODEL_ID, CI_NN_SNORE_MODEL_ID);
         CI_ASSERT(0, "\n");
     }
 #endif
 }
-// 获取声纹模型地址
+//获取声纹模型地址
 void get_ci_vpr_model_addr(void)
 {
-#if USE_VPR
+    #if USE_VPR 
     uint32_t addr;
     uint32_t size;
     if (get_dnn_addr_by_id(VOICE_VPR_DNN_ID, &addr, &size))
@@ -233,9 +237,9 @@ void get_ci_vpr_model_addr(void)
         mprintf("VOICE_VPR_DNN_ID = %d addr = %x, please check\n", VOICE_VPR_DNN_ID, addr);
         CI_ASSERT(0, "\n");
     }
-#endif
+    #endif
 }
-// 获取声纹男女声检测模型地址
+//获取声纹男女声检测模型地址
 void get_ci_wman_vpr_model_addr(void)
 {
 #if USE_WMAN_VPR
@@ -257,75 +261,27 @@ void get_ci_wman_vpr_model_addr(void)
     }
 #endif
 }
-
-// 获取TTS模型地址
-void get_ci_tts_model_addr(void)
+//获取深度降噪模型地址
+uint32_t get_nn_denoise_model_addr(void)
 {
-    uint32_t addr;
-    uint32_t size;
-    // for acu
-    if (get_dnn_addr_by_id(CI_AI_TTS_ACU_MODEL_ID, &addr, &size))
+    uint32_t addr = 0;
+    int timeout = 10;
+    while((!addr) && (timeout--))
     {
-        ciss_set(CI_SS_TTS_ACU_MODEL_ADDR, addr);
+        vTaskDelay(pdMS_TO_TICKS(10));
+        addr = ciss_get(CI_SS_NN_DENOISE_MODEL_ADDR);
     }
-    else
-    {
-        CI_ASSERT(addr, "\n");
-    }
-    // for dur
-    if (get_dnn_addr_by_id(CI_AI_TTS_DUR_MODEL_ID, &addr, &size))
-    {
-        ciss_set(CI_SS_TTS_DUR_MODEL_ADDR, addr);
-    }
-    else
-    {
-        CI_ASSERT(addr, "\n");
-    }
+    CI_ASSERT(timeout,"\n");
+    return addr;
 }
+
 
 void ci_ssp_alg_switch_init(void)
 {
-#if ON_LINE_SUPPORT
-#if USE_ALC_AUTO_SWITCH_MODULE
-    ciss_set(CI_SS_ALC_AUTO_SWITCH_IS_OPEN, true);
-#else
-    ciss_set(CI_SS_ALC_AUTO_SWITCH_IS_OPEN, false);
-#endif
-
-#if USE_AEC_MODULE
-    ciss_set(CI_SS_AEC_IS_OPEN, true);
-#else
-    ciss_set(CI_SS_AEC_IS_OPEN, false);
-#endif
-#if USE_AI_DOA
-    ciss_set(CI_SS_DOA_IS_OPEN, true);
-#else
-    ciss_set(CI_SS_DOA_IS_OPEN, false);
-#endif
-
-#if USE_DEREVERB_MODULE
-    ciss_set(CI_SS_DR_IS_OPEN, true);
-#else
-    ciss_set(CI_SS_DR_IS_OPEN, false);
-#endif
-
-#if USE_BEAMFORMING_MODULE
-    ciss_set(CI_SS_BF_IS_OPEN, true);
-#else
-    ciss_set(CI_SS_BF_IS_OPEN, false);
-#endif
-
-#if USE_DENOISE_MODULE
-    ciss_set(CI_SS_DENOISE_IS_OPEN, true);
-#else
-    ciss_set(CI_SS_DENOISE_IS_OPEN, false);
-#endif
-#endif
-
-#if (IF_USE_ANOTHER_CODEC_TO_GET_REF || USE_SOFT_AEC_REF)
+#if (IF_USE_ANOTHER_CODEC_TO_GET_REF || REF_IN_FROM_INNER_CODEC)
     ciss_set(CI_SS_TWO_CODEC_IS_USED, true);
 #else
-        ciss_set(CI_SS_TWO_CODEC_IS_USED, false);
+    ciss_set(CI_SS_TWO_CODEC_IS_USED, false);
 #endif
 }
 
@@ -334,29 +290,13 @@ static void ven_callback_fun(float vn)
     mprintf("voice energy = %d\n", (int)vn);
 }
 
-#if USE_SOFT_AEC_REF
-#define DATA_VOICE_BUFFER_NUM (4)
-int16_t data_ref_buffer[DATA_VOICE_BUFFER_NUM][AUDIO_CAP_DIV_NUM][AUDIO_CAP_POINT_NUM_PER_FRM / AUDIO_CAP_DIV_NUM];
-
-// MIC数据是双通道的
-#if INNER_CODEC_AUDIO_IN_USE_RESAMPLE
-#define MIC_DATA_NUM AUDIO_CAP_POINT_NUM_PER_FRM / AUDIO_CAP_DIV_NUM * 2 * 2
-#else
-#define MIC_DATA_NUM AUDIO_CAP_POINT_NUM_PER_FRM / AUDIO_CAP_DIV_NUM * 2
-#endif
-
-// 软回采不能使用在单麦的方案上
-int16_t data_mic_buffer[DATA_VOICE_BUFFER_NUM][AUDIO_CAP_DIV_NUM][MIC_DATA_NUM];
-#endif
 void audio_in_manage_inner_task(void *p)
 {
     ci_ssp_alg_switch_init();
-    // 打印中间结果
-    //ctr_asr_detail_result(1);
-
-    // extern void set_nn_to_dtw_init_info(bool cinn_is_using_to_dtw,uint16_t max_num_to_dtw);
-    // set_nn_to_dtw_init_info(true,20);
-
+    //打印中间结果
+    #if ASR_MIDDLE_RESULT_OUT_EN
+    ctr_asr_detail_result(1);
+    #endif
 #if !NO_ASR_FLOW
     while (CI_SS_ASR_SYS_POWER_OFF == ciss_get(CI_SS_ASR_SYS_STATE))
     {
@@ -373,9 +313,13 @@ void audio_in_manage_inner_task(void *p)
 #endif
 
     vTaskSuspendAll();
-#if IF_USE_ANOTHER_CODEC_TO_GET_REF || AUDIO_DATA_PLAY_BY_IIS
+#if IF_USE_ANOTHER_CODEC_TO_GET_REF || MIC_RECORD_IIS_SELECT || AUDIO_DATA_PLAY_BY_IIS
     ref_in_codec_registe();
     cm_start_codec(REF_RECORD_CODEC_ID, CODEC_INPUT);
+#endif
+#if REF_IN_FROM_INNER_CODEC
+    ref_inner_codec_registe();
+    cm_start_codec(REF_RECORD_INNER_CODEC_ID, CODEC_INPUT);
 #endif
     cm_start_codec(HOST_MIC_RECORD_CODEC_ID, CODEC_INPUT);
     ciss_set(CI_SS_MIC_VOICE_STATUE, CI_SS_MIC_VOICE_NORMAL);
@@ -401,26 +345,21 @@ void audio_in_manage_inner_task(void *p)
     int mic_cnt = 0;
     int ref_cnt = 0;
 
-#if USE_SOFT_AEC_REF
-    int buffer_cnt = 0;
-    int div_num = 0;
-    uint32_t pre_ref_addr = 0;
-
-    int mic_data_block_size = MIC_DATA_NUM * sizeof(int16_t);
-    int ref_data_block_size = AUDIO_CAP_POINT_NUM_PER_FRM / AUDIO_CAP_DIV_NUM * sizeof(int16_t);
-#endif
     ciss_set(CI_SS_AST_STATE, 0);
     for (;;)
     {
         uint32_t data_addr = 0, data_size;
 
-#if IF_USE_ANOTHER_CODEC_TO_GET_REF
+#if IF_USE_ANOTHER_CODEC_TO_GET_REF || REF_IN_FROM_INNER_CODEC
         uint32_t data_addr_ref = 0;
         uint32_t data_size_ref;
+        #if REF_IN_FROM_INNER_CODEC
+        cm_read_codec(REF_RECORD_INNER_CODEC_ID, &data_addr_ref, &data_size_ref); // 读取IIS1数据
+        #else
         cm_read_codec(REF_RECORD_CODEC_ID, &data_addr_ref, &data_size_ref); // 读取IIS0数据
-
+        #endif
         print_bnpu_err_cnt();
-        int16_t *data_p = (int16_t *)data_addr_ref;
+        //int16_t *data_p = (int16_t *)data_addr_ref;
         //  for(int i = 0; i < 16; i++)
         // {
         //     mprintf("%d ", data_p[i]);
@@ -437,15 +376,17 @@ void audio_in_manage_inner_task(void *p)
         {
             cm_set_codec_mute(HOST_MIC_RECORD_CODEC_ID, CODEC_INPUT, 1, DISABLE);
             data_cnt++;
-            // mprintf("resume mute\n");
         }
         else if (data_cnt < 100)
         {
             data_cnt++;
         }
 #endif
-
+        #if MIC_RECORD_IIS_SELECT
+        cm_read_codec(REF_RECORD_CODEC_ID, &data_addr, &data_size);
+        #else
         cm_read_codec(HOST_MIC_RECORD_CODEC_ID, &data_addr, &data_size);
+        #endif
         print_bnpu_err_cnt();
         int asr_state = ciss_get(CI_SS_AST_STATE);
         int asr_warning = ciss_get(CI_SS_ASR_WARNING);
@@ -470,50 +411,18 @@ void audio_in_manage_inner_task(void *p)
             ci_logwarn(CI_LOG_WARN, "iisdma int too slow\n");
             continue;
         }
-
-#if USE_SOFT_AEC_REF
-        uint32_t dst_addr = (uint32_t)&data_mic_buffer[buffer_cnt][div_num][0];
-
-        memcpy((void *)dst_addr, (void *)data_addr, data_size);
-
-        int ref_data_size = ref_data_block_size;
-        uint32_t data_addr_ref = get_play_buffer_cur_addr(data_addr);
-        if ((pre_ref_addr != 0) && (data_addr_ref == 0))
-        {
-            memset((void *)data_ref_buffer, 0, AUDIO_CAP_POINT_NUM_PER_FRM * DATA_VOICE_BUFFER_NUM * sizeof(int16_t));
-        }
-        pre_ref_addr = data_addr_ref;
-        memcpy((void *)&data_ref_buffer[buffer_cnt][div_num][0], data_addr_ref, ref_data_size);
-
-        int16_t *data_scale = (int16_t *)&data_ref_buffer[buffer_cnt][div_num][0];
-        for (int n = 0; n < ref_data_size / sizeof(int16_t); n++)
-        {
-            data_scale[n] /= 10;
-        }
-
-        if ((AUDIO_CAP_DIV_NUM - 1) == div_num)
-#endif
         {
             audio_in_get_voice_t voice_info_str;
             voice_info_str.cha_num = 1;
             voice_info_str.channel_flag = 1;
+            voice_info_str.addr1 = data_addr;
 
-#if USE_SOFT_AEC_REF
-            voice_info_str.addr1 = (uint32_t)&data_mic_buffer[buffer_cnt][0][0];
-#else
-                voice_info_str.addr1 = data_addr;
-#endif
-
-#if IF_USE_ANOTHER_CODEC_TO_GET_REF
+#if IF_USE_ANOTHER_CODEC_TO_GET_REF || REF_IN_FROM_INNER_CODEC
             voice_info_str.addr2 = data_addr_ref;
             voice_info_str.cha_num = 2;
 #else
-                voice_info_str.cha_num = 1;
-#if USE_SOFT_AEC_REF
-                voice_info_str.addr2 = (uint32_t)&data_ref_buffer[buffer_cnt][0][0];
-#else
-                voice_info_str.addr2 = 0;
-#endif
+            voice_info_str.cha_num = 1;
+            voice_info_str.addr2 = 0;
 #endif
             voice_info_str.size = data_size;
 
@@ -532,20 +441,7 @@ void audio_in_manage_inner_task(void *p)
             }
 
             send_voice_info_to_audio_in_manage(&voice_info_str);
-
-#if USE_SOFT_AEC_REF
-            buffer_cnt++;
-            buffer_cnt %= DATA_VOICE_BUFFER_NUM;
-
-            div_num = 0;
         }
-        else
-        {
-            div_num++;
-            continue;
-#endif
-        }
-
         iwdg_feed(IWDG);
     }
 }
@@ -556,13 +452,13 @@ void print_bnpu_err_cnt(void)
     static uint32_t nn_err_cnt = 0;
     static uint32_t audio_deal_err_cnt = 0;
     uint32_t cnt = ciss_get(CI_SS_NN_OUT_ERR_CNT);
-    if(cnt != nn_err_cnt)
+    if (cnt != nn_err_cnt)
     {
         mprintf("ERR:CI_SS_ASR_WARNING[%d] = %d\n", 400, nn_err_cnt);
         nn_err_cnt = cnt;
     }
     cnt = ciss_get(CI_SS_AUDIO_DEAL_ERR_CNT);
-    if(cnt != audio_deal_err_cnt)
+    if (cnt != audio_deal_err_cnt)
     {
         mprintf("ERR:audio deal too slow, lost %d frames, please set AUDIO_IN_BUFFER_NUM large, mem use large\n", audio_deal_err_cnt);
         audio_deal_err_cnt = cnt;
@@ -571,6 +467,7 @@ void print_bnpu_err_cnt(void)
 
 __attribute__((weak)) void ci_doa_get_cb(int doa) {}
 __attribute__((weak)) void ci_pwk_get_cb(int db_val) {}
-__attribute__((weak)) void ci_bnpu_err_print(int err_type) {}
+__attribute__((weak)) bool set_doa_out_type(int doa_out_type) {}
 __attribute__((weak)) int ci_doa_get(void) { return 0; }
 __attribute__((weak)) void sed_rslt_cb(void *data) {}
+__attribute__((weak)) void ci_bnpu_err_print(int bnpu_err_type) {}

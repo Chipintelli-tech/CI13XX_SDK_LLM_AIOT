@@ -392,18 +392,47 @@ const cm_codec_hw_info_t host_mic_hw_info =
     .codec_gain.codec_adc_input_mode_l = INNER_CODEC_INPUT_MODE_DIFF,
 #else 
     .codec_gain.codec_adc_input_mode_l = INNER_CODEC_INPUT_MODE_SINGGLE_ENDED,
-#endif 
+#endif
+#if USE_AEC_MODULE
+#if (REF_DIFF_SINGLE == 0)
     .codec_gain.codec_adc_input_mode_r = INNER_CODEC_INPUT_MODE_DIFF,
+#else
+    .codec_gain.codec_adc_input_mode_r = INNER_CODEC_INPUT_MODE_SINGGLE_ENDED,
+#endif
+#else
+#if (MIC_DIFF_SINGLE == 0)
+    .codec_gain.codec_adc_input_mode_r = INNER_CODEC_INPUT_MODE_DIFF,
+#else 
+    .codec_gain.codec_adc_input_mode_r = INNER_CODEC_INPUT_MODE_SINGGLE_ENDED,
+#endif
+#endif
     .codec_gain.codec_adc_mic_amp_l = INNER_CODEC_MIC_AMP_12dB,
     .codec_gain.codec_adc_mic_amp_r = INNER_CODEC_MIC_AMP_12dB,
+    #if AUTO_GET_AEC_GAIN
+    .codec_gain.pga_gain_l = 20.0f,
+    .codec_gain.pga_gain_r = 0.0f,
+    #else
     .codec_gain.pga_gain_l = 28.5f,
     .codec_gain.pga_gain_r = 28.5f,
+    #endif
 #if (MIC_DIFF_SINGLE == 0)
     .codec_gain.dig_gain_l = 1.0f,
 #else
     .codec_gain.dig_gain_l = 6.0f,//数字增益配置，该值加/减 1 ,数字增益加/减 1dB
 #endif 
+#if USE_AEC_MODULE
+#if (REF_DIFF_SINGLE == 0)
     .codec_gain.dig_gain_r = 1.0f,
+#else
+    .codec_gain.dig_gain_r = 6.0f,
+#endif
+#else
+#if (MIC_DIFF_SINGLE == 0)
+    .codec_gain.dig_gain_r = 1.0f,
+#else
+    .codec_gain.dig_gain_r = 6.0f,
+#endif
+#endif
     .codec_if = 
     {
         .codec_init = icodec_init,
@@ -548,7 +577,11 @@ void audio_pre_rslt_out_codec_init(void)
 
     cm_pcm_buffer_info_t pcm_buffer_info;
     pcm_buffer_info.play_buffer_info.block_num = 1;
-    pcm_buffer_info.play_buffer_info.buffer_num = 12;
+#if AUDIO_DATA_UPLOAD_BY_IIS || USE_AUDIO_UPLOAD_BY_HPOUT
+    pcm_buffer_info.play_buffer_info.buffer_num = 20;
+#else
+    pcm_buffer_info.play_buffer_info.buffer_num = 14;
+#endif
     pcm_buffer_info.play_buffer_info.block_size = block_size;
     pcm_buffer_info.play_buffer_info.buffer_size = pcm_buffer_info.play_buffer_info.block_size * pcm_buffer_info.play_buffer_info.block_num;
     pcm_buffer_info.play_buffer_info.pcm_buffer = pvPortMalloc(pcm_buffer_info.play_buffer_info.buffer_size * pcm_buffer_info.play_buffer_info.buffer_num);

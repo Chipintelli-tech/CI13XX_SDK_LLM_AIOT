@@ -14,20 +14,27 @@
 #include CI_CONFIG_FILE
 #endif  
 
+/******************************** sdk 发布使能 *********************************/
+#define SDK_RELEASE_EN                 1
+
 
 /******************************** sdk config *********************************/
 #define MERGE_OFFLINE_SDK_VERSION     "2.1.8"
-#define MERGE_ALG_PRO_SDK_VERSION     "2.5.13"
+#define MERGE_ALG_PRO_SDK_VERSION     "3.0.20"
 
 // SDK VER
-#define SDK_VERSION                    2
-#define SDK_SUBVERSION                 2
-#define SDK_REVISION                   7
-#define SDK_PUB_TYPE                   "Release" //"Release"
-#define SDK_TYPE                       "ALG_PRO_AIOT"
+#define SDK_VERSION                    3
+#define SDK_SUBVERSION                 0
+#define SDK_REVISION                   19
+#define SDK_PUB_TYPE                   "Beta" //"Release"
+#define SDK_TYPE                       "LLM_AIOT"
+
 
 /******************************** 开发板选择 **********************************/
 //板级支持配置
+#ifndef CI_CHIP_TYPE
+#define CI_CHIP_TYPE                   1306    //flash:4MB,QFN40
+#endif
 #ifndef BOARD_PORT_FILE
 #define BOARD_PORT_FILE                "CI-D06GT01D.c"
 #endif
@@ -121,11 +128,6 @@
 #define CONFIG_DIRVER_BUF_USED_FREEHEAP_EN  1
 #endif
 
-/* 在播放中是否暂停语音输入，一般来讲开启aec则不开启暂停语音输入否则开启 */
-#ifndef PAUSE_VOICE_IN_WITH_PLAYING
-#define PAUSE_VOICE_IN_WITH_PLAYING         1
-#endif
-
 /*是否允许关闭提示播报音 */
 #ifndef PROMPT_CLOSE_EN
 #define PROMPT_CLOSE_EN                     1
@@ -180,11 +182,7 @@
 
 //以下宏和响应速度相关
 #ifndef MAX_STOP_VAD_FRM
-#if (MULT_INTENT > 1)
-#define MAX_STOP_VAD_FRM        (60)  //配置VAD_END帧数宏 最大停顿静音间隔帧数 30=300ms 值越大识别响应时间会加长;过短导致出现截断，长词识别为短词 ,建议：英文/小语种 该值至少35,理论范围 [1-60],建议范围[20-50]
-#else
 #define MAX_STOP_VAD_FRM        (30)  //配置VAD_END帧数宏 最大停顿静音间隔帧数 30=300ms 值越大识别响应时间会加长;过短导致出现截断，长词识别为短词 ,建议：英文/小语种 该值至少35,理论范围 [1-60],建议范围[20-50]
-#endif
 #endif
 
 //以下宏和响应速度相关
@@ -204,13 +202,10 @@
 #define DEFAULT_STOP_SILPROB    (0.9f) // 识别结束停顿静音概率阈值,理论范围[0-1]，值越大支持的停顿时间越长
 #endif
 
+#define VAD_ROLL_FRM            (55)   //ASR回退帧数-不可修改
 //以下宏和响应速度相关
 #ifndef DEFAULT_STOP_SILCNT
-#if (MULT_INTENT > 1)
-#define DEFAULT_STOP_SILCNT     (15)  // 识别结束静音连续次数宏：识别结束停顿静音,值越大支持的停顿时间越长,理论范围 [1-200] 建议范围 [1-10]
-#else
 #define DEFAULT_STOP_SILCNT     (2)  // 识别结束静音连续次数宏：识别结束停顿静音,值越大支持的停顿时间越长,理论范围 [1-200] 建议范围 [1-10]
-#endif
 #endif
 
 #ifndef RECOVER_RESULT_ENABLE
@@ -225,20 +220,43 @@
 #define RECOVER_RESULT_MAX_FRM   (0) // RECOVER_RESULT_ENABLE 为1 有效，回收使能 在CNT基础上再增加超时帧数 , 10=300 ms ,理论范围 [0-200],建议范围[0-20]
 #endif 
 
+
+//以下宏和响应速度相关
+#ifndef VAD_START_BACK_FRAMES
+#define VAD_START_BACK_FRAMES     (55)  //VAD-START的时候，计算ASR特征回退的帧数,默认 55 帧 ，建议范围 20~60 ，太小 响应速度略快，但极低音量、低信噪比场景识别率有 3%~5% 左右下降。
+#endif
+
+//以下宏和响应速度相关
+#ifndef VAD_START_BACK_FRAMES_ADAPTIVE_EN
+#define VAD_START_BACK_FRAMES_ADAPTIVE_EN     (0)   //VAD-START的时候，自适应配置计算ASR特征回退的帧数, 
+                                                    //当使能后 通常情况为 VAD_START_BACK_FRAMES_FASTER 帧,当特殊情况配回 VAD_START_BACK_FRAMES 帧
+                                                    //当使用 PRO7 并非常在意响应速度(极低音量、极低信噪比识别会3%~5% 左右下降)，可以开启(开启 响应速度提升40~100ms)。
+#endif
+
+//以下宏和响应速度相关
+#ifndef VAD_START_BACK_FRAMES_FASTER
+#define VAD_START_BACK_FRAMES_FASTER        (30)  // 当 VAD_START_BACK_FRAMES_ADAPTIVE_EN 为 1有效 , VAD-START的时候，计算ASR特征回退的帧数，
+                                                  // 通常情况为 VAD_START_BACK_FRAMES_FASTER 帧，特殊情况自动配回 VAD_START_BACK_FRAMES
+#endif
+
+
+
+
 /*************************** 语音前端算法 config *****************************/
 
 /*单MIC DENOISE*/
-#ifndef USE_DENOISE_MODULE
-#define USE_DENOISE_MODULE             0
-#endif
-/*单MIC 深度学习降噪*/
-#ifndef USE_DENOISE_NN
-#define USE_DENOISE_NN                 0   
+#ifndef USE_TRA_DENOISE
+#define USE_TRA_DENOISE             0
 #endif
 
-/*单MIC 深度学习降噪（通话降噪）*/
-#ifndef USE_DENOISE_NN_RTC
-#define USE_DENOISE_NN_RTC            0    
+/*单MIC 深度学习降噪*/
+#ifndef USE_NN_DENOISE
+#define USE_NN_DENOISE                 0   
+#endif
+
+/*NN VAD*/
+#ifndef USE_NN_VAD
+#define USE_NN_VAD                    0
 #endif
 
 /*单MIC 均衡器*/
@@ -251,9 +269,13 @@
 #define USE_DRC_MODULE                 0    
 #endif
 
-/*双MIC AI DOA*/
-#ifndef USE_AI_DOA
-#define USE_AI_DOA                     0  
+/*双MIC NN DOA*/
+#ifndef USE_NN_DOA
+#define USE_NN_DOA                     0  
+#endif
+
+#ifndef USE_GCC_DOA
+#define USE_GCC_DOA                     0  
 #endif
 
 /*双MIC DEREVERB*/
@@ -271,18 +293,6 @@
 #define USE_AEC_MODULE                 0    
 #endif
 
-/*vox产生vad标签*/
-#ifndef USE_VOX_MODULE
-#define USE_VOX_MODULE                 0    
-#endif
-
-#define VOX_VAD_THRE_DB_MIN           45     
-#define VOX_VAD_THRE_DB_MAX           60
-#define VOX_VAD_THRE_DB_DEFAULT       50.0f      //值越大，vad越不容易触发，语音检测能量阈值(45~60dB) 高灵敏度45~48dB 中灵敏度49~52dB 低灵敏度53~60dB 
-
-//#define VOX_VAD_SENSITIVITY           0        //vad start响应速度， 0-高灵敏度 1-中灵敏度 2-低灵敏度
-
-#define VOX_VAD_END_CONFIDENCE_DEFAULT      15   //允许语音停顿的时间；6:约300ms；15:约400ms；20:约500ms；50:约1S 80::约1.5S 120:约2S （如果有背景噪声没有消除干净，延时时间会变长）
 /*啸叫抑制 AHS*/
 #ifndef USE_AHS_MODULE
 #define USE_AHS_MODULE                 0    
@@ -312,9 +322,9 @@
 #endif
 
 
-/*是否使用重采样*/
+/*是否使用重采样（若开启AEC并且使用外部codec，IIS0输入ref信号采样率32khz，那么其输出也是32khz）*/
 #ifndef INNER_CODEC_AUDIO_IN_USE_RESAMPLE
-#define INNER_CODEC_AUDIO_IN_USE_RESAMPLE   1   //默认打开   0:不开重采样   1：打开重采样 
+#define INNER_CODEC_AUDIO_IN_USE_RESAMPLE   1   //默认打开   0:不开重采样   1：打开重采样
 #endif
 
 
@@ -361,11 +371,6 @@
 #define USE_SED                 0
 #endif
 
-/*TTS算法*/
-#ifndef USE_TTS
-#define USE_TTS                 0
-#endif
-
 /******************************** VP config **********************************/
 
 //1:开启VP计算；0：关闭VP计算
@@ -408,7 +413,7 @@
 
 //**播放器类型选择
 #ifndef SIMPLE_AUDIO_PLAYER_ENABLE
-#define SIMPLE_AUDIO_PLAYER_ENABLE            0  /* 1:使用精简播放器(节省内存-14KB)  0：使用老播放器 */
+#define SIMPLE_AUDIO_PLAYER_ENABLE            1  /* 1:使用精简播放器(节省内存-14KB)  0：使用老播放器 */
 #endif
 /* 注册prompt解码器 */
 #ifndef USE_PROMPT_DECODER
@@ -613,7 +618,8 @@
 
  #endif
 
-
+//系统参数同步
+#define BNPU_HOST_PARAM_SYNC_MAGIC   0x5a5aa5a5   //bnpu和host参数设置完成同步
 /***************************** flash加密 config ******************************/
 /*flash防拷贝加密 */
 #ifndef COPYRIGHT_VERIFICATION
@@ -675,22 +681,24 @@
 #define VAD_SENSITIVITY         VAD_SENSITIVITY_HIGH    //用于配置VAD灵敏度
 #endif
 
+#define DNN_NUM_CHECK_MAX          5         //dnn最大模型检测个数
 
 
 //语音相关的宏
 /*********************** 使用外部IIS输入语音进行识别 *************************/
 #ifndef AUDIO_IN_BUFFER_NUM
-    #if USE_DENOISE_NN || USE_AI_DOA
-    #if AUDIO_DATA_UPLOAD_BY_HPOUT || AUDIO_DATA_UPLOAD_BY_IIS
-    #define AUDIO_IN_BUFFER_NUM (20)//只为DENOISE_NN和USE_AI_DOA留这么多  //hpout、iis内存足够，多预留8帧缓存
+    #if USE_NN_DENOISE || USE_NN_DOA
+    #if USE_AUDIO_UPLOAD_BY_HPOUT || USE_AUDIO_UPLOAD_BY_IIS
+    #define AUDIO_IN_BUFFER_NUM (20)//只为DENOISE_NN和USE_NN_DOA留这么多  //hpout、iis内存足够，多预留8帧缓存
     #else
-    #define AUDIO_IN_BUFFER_NUM (12)//只为DENOISE_NN和USE_AI_DOA留这么多  //至少预留12,不然会影响aec效果
+    #define AUDIO_IN_BUFFER_NUM (15)//只为DENOISE_NN和USE_NN_DOA留这么多  //至少预留12,不然会影响aec效果
     #endif
     #else
-    #define AUDIO_IN_BUFFER_NUM (4)
+    #define AUDIO_IN_BUFFER_NUM (10)
     #endif
 #endif
 
+#define POST_MIN_CNT               2    //默认设置为2,设置为1会提升4个点的识别率，但误识会增加；设置到3，误识最低，用户根据需求调整
 
 //使用IIS输出算法处理之后的语音
 #ifndef USE_IIS1_OUT_PRE_RSLT_AUDIO
@@ -717,13 +725,18 @@
 // #ifndef USE_OUTSIDE_CODEC_PLAY
 // #define USE_OUTSIDE_CODEC_PLAY      0//使用外部codec进行播放
 // #endif
+#define REF_IN_FROM_INNER_CODEC     0
 
 #ifndef HOST_MIC_USE_NUMBER              
 #define HOST_MIC_USE_NUMBER     1      //使用mic数量
 #endif
 
-#ifndef HOST_MIC_RECORD_CODEC_ID              
+#ifndef HOST_MIC_RECORD_CODEC_ID   
+#if  REF_IN_FROM_INNER_CODEC
+#define HOST_MIC_RECORD_CODEC_ID     2   //主MIC录音codec id: 0：主MIC接外部CODEC  1：主MIC接内部CODEC 2：主MIC使用PDM
+#else
 #define HOST_MIC_RECORD_CODEC_ID     1   //主MIC录音codec id: 0：主MIC接外部CODEC  1：主MIC接内部CODEC 2：主MIC使用PDM
+#endif           
 #endif
 
 #ifndef HOST_CODEC_CHA_NUM              
@@ -742,16 +755,21 @@
 #define REF_RECORD_CODEC_ID     0   //参考信号录音codec id: 0：参考信号接外部CODEC  1：参考信号接内部CODEC 2：参考信号使用PDM，
 #endif                              //只在参考和MIC使用不一样的CODEC时使用
 
+#if  REF_IN_FROM_INNER_CODEC
+#ifndef REF_RECORD_INNER_CODEC_ID              
+#define REF_RECORD_INNER_CODEC_ID        1   //iis_sample中  0：主MIC接外部CODEC  1：主MIC使用PDM 2：aec_ref
+#endif
+#endif
 
 #ifndef REF_RECORD_CODEC_CHA_NUM              
 #define REF_RECORD_CODEC_CHA_NUM     1   //主COEDC的通道数，使用双麦算法和单MIC AEC的时候都应是2
 #endif                                   //只在参考和MIC使用不一样的CODEC时使用
 
-#if ((HOST_MIC_RECORD_CODEC_ID + ASSIST_MIC_RECORD_CODEC_ID + REF_RECORD_CODEC_ID) != 3)
+#if ((HOST_MIC_RECORD_CODEC_ID + ASSIST_MIC_RECORD_CODEC_ID + REF_RECORD_CODEC_ID) != 3) && !REF_IN_FROM_INNER_CODEC
 #error "error\n"
 #endif
 
-#if (ASSIST_MIC_RECORD_CODEC_ID == HOST_MIC_RECORD_CODEC_ID)
+#if (ASSIST_MIC_RECORD_CODEC_ID == HOST_MIC_RECORD_CODEC_ID) && !REF_IN_FROM_INNER_CODEC
 #error "error\n"
 #endif
 
@@ -776,11 +794,6 @@
 #endif
 
 
-#ifndef USE_SOFT_AEC_REF    
-#define USE_SOFT_AEC_REF    (0)             //是否使用软回采
-#endif
-
-
 #ifndef AUDIO_CAP_DIV_NUM    
 #define AUDIO_CAP_DIV_NUM    (4)            //软回采的时候，将原来的一帧分为多少段
 #endif
@@ -798,7 +811,7 @@
 
 
 #ifndef IF_JUST_CLOSE_HPOUT_WHILE_NO_PLAY
-#define IF_JUST_CLOSE_HPOUT_WHILE_NO_PLAY    0//没有播报的时候只关HP：0：没有播报的时候关DAC（省电，但是蓝牙播报的时候会干扰ADC）
+#define IF_JUST_CLOSE_HPOUT_WHILE_NO_PLAY          0//没有播报的时候只关HP：0：没有播报的时候关DAC（省电，但是蓝牙播报的时候会干扰ADC）
 #endif    
 
 
@@ -812,14 +825,6 @@
 #ifndef USE_INNER_LDO3
 #define USE_INNER_LDO3                      1
 #endif
-
-
-/*! 在线应用相关支持的开关 */
-#ifndef ON_LINE_SUPPORT
-//设置为 1 时，lds调整向后移4K
-#define ON_LINE_SUPPORT                     0    // 0: 关闭在线应用相关支持；1: 开启在线应用相关支持。
-#endif
-
 
 /*! 离线双麦算法相关支持的开关，打开之后需要调整lds少8K */
 #ifndef OFFLINE_DUAL_MIC_ALG_SUPPORT
@@ -836,20 +841,14 @@
 #define MIC_DIFF_SINGLE                     0              //1，单端。0，差分（通用模块都是差分模式，省成本的模块为单端（MICN_L 接GND）时，需要配置为SINGLE）
 #endif
 
-#define CIAS_FLASH_IMAGE_UPGRADE_FLAG_ADDR      (0X9000)   //for ota,固定不可修改
-#ifndef CI_OTA_ENABLE
-#define CI_OTA_ENABLE                       0
-#endif
+#define OTA_STA_UPDATE              0xFC                  //不可修改
+#define OTA_STA_FINISH              0xF0                  //不可修改
 
-#if (USE_LOWPOWER_DOWN_FREQUENCY || USE_SOFT_AEC_REF)
+#if (USE_LOWPOWER_DOWN_FREQUENCY)
 #undef INNER_CODEC_AUDIO_IN_USE_RESAMPLE
 #define INNER_CODEC_AUDIO_IN_USE_RESAMPLE   0
 #endif
 
-#if USE_SOFT_AEC_REF
-#undef  IF_USE_ANOTHER_CODEC_TO_GET_REF
-#define IF_USE_ANOTHER_CODEC_TO_GET_REF 0
-#endif
 
 #ifndef ONE_SHOT_ENABLE
 #define ONE_SHOT_ENABLE                     0              //1：开启oneshot功能。0：关闭oneshot功能
@@ -863,52 +862,15 @@
 #define MULT_INTENT                         1               //意图数量  max 3
 #endif
 
-#define NLP_CMD_CNT_MAX                     50
-#define NLP_CMD_CNT_DEFAULT                 60
-#define NLP_CMD_CNT_MIN                     25
+
+#define NLP_CMD_CNT_DEFAULT                 30
 #define NLP_CMD_CNT_END                     12
-#define NLP_STL_LEN                         15
-#define NLP_NODES_CFD_TIMES                 40             //节点置信度次数，用于判断是否有语音输入
-#define NLP_POWER_ON_WAIT_TIMES             7              //开机与下一个词之间的间隔次数，用于是否消除开机
+#define NLP_STL_LEN                         6
+#define NLP_NODES_CFD_TIMES                 25             //节点置信度次数，用于判断是否有语音输入
+#define NLP_POWER_ON_WAIT_TIMES             4              //开机与下一个词之间的间隔次数，用于是否消除开机
 #define NLP_POWER_OFF_WAIT_TIMES            12             //风扇关闭与下一个词之间的间隔次数，用于是否消除开机
 
 
 #ifndef CLOUD_UART_PROTOCOL_EN
 #define CLOUD_UART_PROTOCOL_EN              0              //1：开启启英平台协议。0：关闭启英平台协议
-#endif
-
-
-/*--蓝牙BLE配置开关--*/
-#ifndef EXTERNAL_CRYSTAL_OSC_FROM_RF
-#define EXTERNAL_CRYSTAL_OSC_FROM_RF           0            //蓝牙端使用外部晶振, 语音端时钟由蓝牙端提供-用户不可修改
-#endif
-#ifndef CIAS_BLE_CONNECT_MODE_ENABLE
-#define CIAS_BLE_CONNECT_MODE_ENABLE           0          //ble连接模式使能
-#endif
-#ifndef CIAS_BLE_SCAN_ENABLE
-#define CIAS_BLE_SCAN_ENABLE                   0          //ble连接模式使能, 同时广播开启扫描功能
-#if     (CIAS_BLE_SCAN_ENABLE == 1 && CIAS_BLE_CONNECT_MODE_ENABLE != 1)
-#define CIAS_BLE_CONNECT_MODE_ENABLE           0
-#endif
-#endif
-#ifndef CIAS_BLE_ADV_GROUP_MODE_ENABEL
-#define CIAS_BLE_ADV_GROUP_MODE_ENABEL         0          //ble纯广播模式
-#endif
-#if CIAS_BLE_CONNECT_MODE_ENABLE && CIAS_BLE_ADV_GROUP_MODE_ENABEL
-#error "CIAS_BLE_CONNECT_MODE_ENABLE and CIAS_BLE_ADV_GROUP_MODE_ENABEL ONLY ENABLE ONE"
-#endif
-#ifndef CIAS_BLE_DEBUG_ENABLE
-#define CIAS_BLE_DEBUG_ENABLE                  0          //ble 测试模式-客户一般用不上
-#endif
-#if (CIAS_BLE_DEBUG_ENABLE == 1)                          //开启AT指令
-#define CIAS_BLE_AT_ENABLE                     0
-#endif 
-#ifndef BLE_CONNECT_TIMEOUT
-#define BLE_CONNECT_TIMEOUT                8              //蓝牙连接超时时间(S),超时会重启蓝牙协议栈,设置为0则表示不进行超时判断
-#endif
-#ifndef BLE_NAME_MAX_LEN
-#define BLE_NAME_MAX_LEN                   18             //蓝牙广播名称最大长度
-#endif
-#ifndef RF_RX_TX_MAX_LEN
-#define RF_RX_TX_MAX_LEN                   20             //蓝牙收发数据最大长度为20,一般不用修改
 #endif

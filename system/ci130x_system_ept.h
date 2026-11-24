@@ -238,24 +238,24 @@ typedef enum
     cm_set_codec_adc_gain_ept_num,                  //105
 	cm_get_codec_alc_state_ept_num,                 //106
 
-    cinn_malloc_in_host_sram_ept_num,               //106
-    cinn_free_in_host_sram_ept_num,                 //107
+    cinn_malloc_in_host_sram_ept_num,               //107
+    cinn_free_in_host_sram_ept_num,                 //108
     
 
-    codec_manage_nuclear_com_num_end,               //108
+    codec_manage_nuclear_com_num_end,               //109
 
-    audio_in_nuclear_com_num_start,                 //109
-    send_voice_info_to_audio_in_manage_ept_num,     //110
-    set_ssp_registe_ept_num,                        //111
-    audio_in_nuclear_com_num_end,                   //112
+    audio_in_nuclear_com_num_start,                 //110
+    send_voice_info_to_audio_in_manage_ept_num,     //111
+    set_ssp_registe_ept_num,                        //112
+    audio_in_nuclear_com_num_end,                   //113
 
 
-    other_fun_nuclear_com_num_start,                //113
-    ciss_init_ept_num,                              //114
-    other_fun_nuclear_com_num_end,                  //115
+    other_fun_nuclear_com_num_start,                //114
+    ciss_init_ept_num,                              //115
+    other_fun_nuclear_com_num_end,                  //116
     
-    get_g_dnn_stop_flag_cal_ept_num,                //116
-    send_utf8text_to_tts_manage_ept_num,            //117
+    get_g_dnn_stop_flag_cal_ept_num,                //117
+    send_utf8text_to_tts_manage_ept_num,            //118
 }asr_rpmsg_ept_num_t;
 
 #endif /* CI130X_SYSTEM_EPT_H */

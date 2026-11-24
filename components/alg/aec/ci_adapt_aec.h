@@ -30,14 +30,13 @@ typedef struct
     
     int nlp_flag;//非线性处理模块选择模式，默认使用模式二， 0:不使用，1：使用模式一失真会更大，2：使用模式二失真要更小，3:先使用模式二后使用模式一
     int aggr_mode; //默认1，算法处理的效果等级：0，1，2，处理效果依次增强，算力内存也会依次增大
-    
     float aec_gain;//增益数值
     float aec_enable_threshold;//门限值
-    //float aec_mic_div_ref_thr;//AEC门限基础值,参考与麦克风幅值比值
     int alc_off_codec_adc_gain_mic; 
     int alc_off_codec_adc_gain_ref;
     
     aec_control_mode_t aec_control_mode ;
+    float dtd_ratio;//coh比例系数
 }aec_config_t;
 
  
@@ -81,7 +80,7 @@ extern "C" {
      * @param fft_out           AEC处理信号的频域输出;
      * @return int              0: AEC算法处理模块正常运行；其它：AEC算法处理过程出现异常.
      */
-    int ci_adapt_aec_deal(void* handle, float** fft_mic_in, float** fft_ref_in, float** fft_out);
+    int ci_adapt_aec_deal(void* handle, float** fft_mic_in, float** fft_ref_in, float** fft_out, float* fft_out_vad);
     void set_nlp_flag_api(int flag);
     void set_para_api(int alpha_l, int deta_d);
    

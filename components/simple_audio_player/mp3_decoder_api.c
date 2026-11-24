@@ -148,7 +148,7 @@ static int get_info(void* decoder_handle, uint8_t *data, int *bytes_left, uint8_
         {
             err_cnt++;
             gap_index = 0;
-            //ci_logwarn(LOG_AUDIO_PLAY, "ERR_MP3_err!\n");
+            ci_logwarn(LOG_AUDIO_PLAY, "ERR_MP3_err!\n");
             if(err_cnt >3)
             {
                 ci_logwarn(LOG_AUDIO_PLAY, "mp3_decorde err %d,bad frame!\n", err);

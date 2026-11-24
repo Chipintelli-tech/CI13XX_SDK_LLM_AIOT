@@ -73,13 +73,12 @@ uint8_t vpt_data_cmp[VPT_SIZE] = {0};       //用于识别时候从flash取出�
 int vpr_init(vpr_callback_t callback_func)
 {
     REMOTE_CALL(vp_nn_cmpt_cfg(VP_USE_FRM_LEN/10,VP_CMPT_SKIP_NUM));
-    mprintf("VP_USE_FRM_LEN = %d\n",VP_USE_FRM_LEN);
+    ci_logdebug(LOG_SYS_INFO, "VP_USE_FRM_LEN = %d\n",VP_USE_FRM_LEN);
     extern void get_ci_vpr_model_addr(void);
     get_ci_vpr_model_addr();
     vpr_info.status = VPR_STATUS_IDLE;
     vpr_info.callback_func = callback_func;
-    vpr_info.reg_timer = xTimerCreate("vpr_reg_timout", pdMS_TO_TICKS(MAX_VP_REG_TIME*1000),
-        pdFALSE, (void *)0, vpr_reg_timeout_callback);
+    vpr_info.reg_timer = xTimerCreate("vpr_reg_timout", pdMS_TO_TICKS(MAX_VP_REG_TIME*1000), pdFALSE, (void *)0, vpr_reg_timeout_callback);
     vpr_tmp_init();     // 模板管理初始化
     return 0;
 }
@@ -90,7 +89,7 @@ int vpr_init(vpr_callback_t callback_func)
  */
 int vpr_start_regist()
 {
-    mprintf("vpr_start_regist\n");
+    ci_logdebug(LOG_SYS_INFO, "vpr_start_regist\n");
     if (vpr_info.vpt_number < MAX_VP_TEMPLATE_NUM)
     {
         vpr_info.status = VPR_STATUS_REG;
@@ -133,20 +132,6 @@ int vpr_clear()
     vpr_tmp_delete_all();
     return 0;
 } 
-/* float get_vpr_max_onetmp(float *vpt_data_temp,float *vp_buffer_identify)
-{
-    float cos_distance,cos_distance_max = 0;
-    for (size_t i = 0; i < VP_REC_TIMES; i++)
-    {
-        cosin_metric(&vpt_data_temp[i*VPT_SIZE],vp_buffer_identify,&cos_distance);
-        mprintf("cos_distance%d:%d\t",i,(int)(cos_distance*1000));
-        if (cos_distance > cos_distance_max)
-        {
-            cos_distance_max = cos_distance;
-        }
-    }
-    return cos_distance_max;
-} */
 uint8_t get_vpr_max(float *cos_distance)
 {
     int index,i,k=0;
@@ -162,7 +147,7 @@ uint8_t get_vpr_max(float *cos_distance)
             {
                 vpr_tmp_get(vpr_info_id[i], vpt_data_cmp, VPT_SIZE);
                 cosin_metric(vpt_data_cmp,vpt_data_temp,&cos_distance_temp);
-                mprintf("%d,%d: %d; ", i,k,(int)(cos_distance_temp*1000));
+                ci_logdebug(LOG_SYS_INFO, "%d,%d: %d; ", i,k,(int)(cos_distance_temp*1000));
                 if (cos_distance_temp > *cos_distance)
                 {
                     *cos_distance = cos_distance_temp;
@@ -170,7 +155,7 @@ uint8_t get_vpr_max(float *cos_distance)
                 }
             }
         }
-        mprintf("\r\n");
+        ci_logdebug(LOG_SYS_INFO, "\r\n");
     }
     return index;
 }
@@ -191,7 +176,7 @@ void vpr_registe()
     else
     {
         cosin_metric(vpt_data_temp, vpt_data_register, &score); // 第二次跟第一次比 
-        mprintf("第%d次重采样!>>>>>>>score:%d\n",vpr_info.record_times,(int)(score*1000)); 
+        ci_logdebug(LOG_SYS_INFO, "第%d次重采样!>>>>>>>score:%d\n",vpr_info.record_times,(int)(score*1000)); 
         if (score > VP_THR_FOR_SAME_MATCH)
         {
             xTimerReset(vpr_info.reg_timer,0);
@@ -248,7 +233,7 @@ int vpr_run_one_recognition()
         if (vpr_info.vpt_number)
         {
             get_vpr_max(&cos_distance);
-            mprintf("max socre %d\n", (int)(cos_distance*1000));
+            ci_logdebug(LOG_SYS_INFO, "max socre %d\n", (int)(cos_distance*1000));
             if (cos_distance > VP_THR_FOR_SAME_MATCH)  
             {
                 xTimerStop(vpr_info.reg_timer, 0);
@@ -261,11 +246,11 @@ int vpr_run_one_recognition()
         break;
 
     case VPR_STATUS_REC:
-        //mprintf("vpr_run_one_recognition number %d\n",vpr_info.vpt_number);
+        //ci_logdebug(LOG_SYS_INFO, "vpr_run_one_recognition number %d\n",vpr_info.vpt_number);
         if (vpr_info.vpt_number)
         {
             index = get_vpr_max(&cos_distance);// 查找最大分数的人以及最大分数
-            mprintf("id %x max score %d\n", vpr_info_id[index],(int)(cos_distance*1000));
+            ci_logdebug(LOG_SYS_INFO, "id %x max score %d\n", vpr_info_id[index],(int)(cos_distance*1000));
             index = index/VP_REC_TIMES;
             if (cos_distance > VP_THR_FOR_MATCH)
             {
@@ -273,7 +258,7 @@ int vpr_run_one_recognition()
                 {
                     vpr_info.callback_func(vpr_rec_successed, index);
                 }
-                //mprintf("vpr rst: %d cos_distance :\n", index, cos_distance);
+                //ci_logdebug(LOG_SYS_INFO, "vpr rst: %d cos_distance :\n", index, cos_distance);
             }
             else
             {
@@ -309,7 +294,7 @@ void vpr_reg_timeout_callback(TimerHandle_t xTimer)
         vPortFree(vpt_data_register);
         vpt_data_register = NULL;
     }
-    mprintf("vrp reg timeout!\n");
+    ci_logdebug(LOG_SYS_INFO, "vrp reg timeout!\n");
 }
 
 //////////////////template manage//////////////////////
@@ -330,11 +315,11 @@ int vpr_tmp_init()
     else
     {
         cinv_item_read(NVDATA_ID_VP_INFO, MAX_VP_TEMPLATE_NUM*VP_REC_TIMES*4, vpr_info_id, &real_len);
-        mprintf("vpr_info rigster number:%d\r\n",num);
+        ci_logdebug(LOG_SYS_INFO, "vpr_info rigster number:%d\r\n",num);
         for (size_t i = 0; i < MAX_VP_TEMPLATE_NUM*VP_REC_TIMES; i++)
         {
             if (vpr_info_id[i] != 0)
-                mprintf("vpr_info_id : %x\r\n",vpr_info_id[i]);
+                ci_logdebug(LOG_SYS_INFO, "vpr_info_id : %x\r\n",vpr_info_id[i]);
         }
         vpr_info.status = VPR_STATUS_REC;
     }
@@ -353,7 +338,7 @@ uint8_t vpr_tmp_add(uint8_t * vpt_data, uint32_t vpt_data_len)
     for (size_t k = 0; k < VP_REC_TIMES; k++)
     {
         uint32_t save_id = NVDATA_ID_VP_MODE + i*VP_REC_TIMES + k;
-        mprintf("vpr_tmp_add save_id:%x\r\n",save_id);
+        ci_logdebug(LOG_SYS_INFO, "vpr_tmp_add save_id:%x\r\n",save_id);
         if (CINV_OPER_SUCCESS != cinv_item_write(save_id, VPT_SIZE, &vpt_data[k*VPT_SIZE]))  //存储模版
         {
             cinv_item_init(save_id, VPT_SIZE, &vpt_data[k*VPT_SIZE]);
@@ -390,7 +375,7 @@ int vpr_tmp_del(int index)
     {
         for (size_t i = 0; i < VP_REC_TIMES; i++)
         {
-            mprintf("vpr_tmp_del %x\r\n",vpr_info_id[index*VP_REC_TIMES + i]);
+            ci_logdebug(LOG_SYS_INFO, "vpr_tmp_del %x\r\n",vpr_info_id[index*VP_REC_TIMES + i]);
             if(CINV_OPER_SUCCESS == cinv_item_delete(vpr_info_id[index*VP_REC_TIMES + i]))
             {
                 vpr_info_id[index*VP_REC_TIMES + i] = 0;
@@ -414,7 +399,7 @@ int vpr_tmp_delete_all()
         if (vpr_info_id[i] != 0)
         {
             cinv_item_delete(vpr_info_id[i]);
-            mprintf("vpr_tmp_delete %x\r\n",vpr_info_id[i]);
+            ci_logdebug(LOG_SYS_INFO, "vpr_tmp_delete %x\r\n",vpr_info_id[i]);
         }
     }
     vpr_info.vpt_number = 0;
@@ -462,7 +447,7 @@ void vpr_callback(vpr_callback_rst_t rst, int rec_index)
     switch(rst)
     {
         case vpr_reg_successed:
-            mprintf("voice print registe successed:%x\n", rec_index);
+            ci_logdebug(LOG_SYS_INFO, "voice print registe successed:%x\n", rec_index);
             #if CLOUD_CFG_PLAY_EN
                 if(gVPRCloudCmdProtocol[rec_index][VPR_REG_SUCCESS].cloudCmdProtocol.play_type == 0)  //主动播报
                     prompt_play_by_cmd_id(gVPRCloudCmdProtocol[rec_index][VPR_REG_SUCCESS].cloudCmdProtocol.cmd_id, -1, default_play_done_callback, true);
@@ -472,7 +457,7 @@ void vpr_callback(vpr_callback_rst_t rst, int rec_index)
             #endif
             break;
         case vpr_reg_failed:
-            mprintf("voice print registe failed:%x\n", rec_index);
+            ci_logdebug(LOG_SYS_INFO, "voice print registe failed:%x\n", rec_index);
             #if CLOUD_CFG_PLAY_EN
                 if(gVPRCloudCmdProtocol[rec_index][VPR_REG_ERR].cloudCmdProtocol.play_type == 0)  //主动播报
                     prompt_play_by_cmd_id(gVPRCloudCmdProtocol[rec_index][VPR_REG_ERR].cloudCmdProtocol.cmd_id, -1, default_play_done_callback, true);
@@ -482,7 +467,7 @@ void vpr_callback(vpr_callback_rst_t rst, int rec_index)
             #endif
             break;
         case vpr_rec_successed:
-            mprintf("voice print recognition successed:%x\n", rec_index);
+            ci_logdebug(LOG_SYS_INFO, "voice print recognition successed:%x\n", rec_index);
             g_voice_print_rec_index = rec_index;
             #if CLOUD_CFG_PLAY_EN
                 if(gVPRCloudCmdProtocol[rec_index][VPR_ASR_SUCCESS].cloudCmdProtocol.play_type == 0)  //主动播报
@@ -493,7 +478,7 @@ void vpr_callback(vpr_callback_rst_t rst, int rec_index)
             #endif
             break;
         case vpr_rec_failed:
-            mprintf("voice print recognition failed:%x\n", rec_index);
+            ci_logdebug(LOG_SYS_INFO, "voice print recognition failed:%x\n", rec_index);
             g_voice_print_rec_index = -1;
             #if CLOUD_CFG_PLAY_EN
                 if(gVPRCloudCmdProtocol[rec_index][VPR_ASR_ERR].cloudCmdProtocol.play_type == 0)  //主动播报
@@ -505,11 +490,11 @@ void vpr_callback(vpr_callback_rst_t rst, int rec_index)
             break;
         case vpr_reg_resample:
             prompt_play_by_cmd_id(VPR_REG_RESAMPLE,-1,default_play_done_callback,true);
-            mprintf("voice print recognition resample\n");
+            ci_logdebug(LOG_SYS_INFO, "voice print recognition resample\n");
             break;
         case vpr_reg_resample_failed:
             prompt_play_by_cmd_id(VPR_REG_RESAMPLE_FAILED,rec_index,default_play_done_callback,true);
-            mprintf("voice print recognition resample failed\n");
+            ci_logdebug(LOG_SYS_INFO, "voice print recognition resample failed\n");
             break;
         default:
             break;
@@ -522,29 +507,29 @@ void vpr_callback(vpr_callback_rst_t rst, int rec_index)
     {
         case vpr_reg_successed:
             prompt_play_by_cmd_id(VPR_REG_SUCCESSED,-1,default_play_done_callback,true);
-            mprintf("voice print registe successed:%x\n", rec_index);
+            ci_logdebug(LOG_SYS_INFO, "voice print registe successed:%x\n", rec_index);
             break;
         case vpr_reg_failed:
             prompt_play_by_cmd_id(VPR_REG_FAILED,-1,default_play_done_callback,true);
-            mprintf("voice print registe failed:%x\n", rec_index);
+            ci_logdebug(LOG_SYS_INFO, "voice print registe failed:%x\n", rec_index);
             break;
         case vpr_rec_successed:
             prompt_play_by_cmd_id(VPR_REC_SUCCESSED,-1,default_play_done_callback,true);
-            mprintf("voice print recognition successed:%x\n", rec_index);
+            ci_logdebug(LOG_SYS_INFO, "voice print recognition successed:%x\n", rec_index);
             g_voice_print_rec_index = rec_index;
             break;
         case vpr_rec_failed:
             prompt_play_by_cmd_id(VPR_REC_FAILED,-1,default_play_done_callback,true);
             g_voice_print_rec_index = -1;
-            mprintf("voice print recognition failed:%x\n", rec_index);
+            ci_logdebug(LOG_SYS_INFO, "voice print recognition failed:%x\n", rec_index);
             break;
         case vpr_reg_resample:
             prompt_play_by_cmd_id(VPR_REG_RESAMPLE,-1,default_play_done_callback,true);
-            mprintf("voice print recognition resample\n");
+            ci_logdebug(LOG_SYS_INFO, "voice print recognition resample\n");
             break;
         case vpr_reg_resample_failed:
             prompt_play_by_cmd_id(VPR_REG_RESAMPLE_FAILED,rec_index,default_play_done_callback,true);
-            mprintf("voice print recognition resample failed\n");
+            ci_logdebug(LOG_SYS_INFO, "voice print recognition resample failed\n");
             break;
         default:
             break;

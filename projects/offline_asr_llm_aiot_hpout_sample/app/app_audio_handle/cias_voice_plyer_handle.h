@@ -12,8 +12,9 @@
 #if 1
 #include <stdbool.h>
 #include "cias_network_msg_protocol.h"
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
 #include "audio_play_os_port.h"
-
+#endif
 typedef enum 
 {
     START_PLAY_TTS = 0,

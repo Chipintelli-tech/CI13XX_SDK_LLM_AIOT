@@ -35,9 +35,7 @@ void _init()
 	dpmu_rc_freq_sel(DPMU_RC_FREQ_12d288M);
 
     extern void board_clk_source_set(void);
-    #if (EXTERNAL_CRYSTAL_OSC_FROM_RF == 0)
     board_clk_source_set();
-    #endif
 
     #if USE_LOWPOWER_DOWN_FREQUENCY
     dpmu_pll_config(SRC_FREQUENCY_LOWPOWER, MAIN_FREQUENCY);

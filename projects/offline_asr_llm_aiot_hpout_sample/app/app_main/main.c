@@ -16,8 +16,6 @@
 #include "ci130x_spiflash.h"
 #include "ci130x_gpio.h"
 #include "ci130x_dma.h"
-#include "audio_play_api.h"
-#include "audio_play_decoder.h"
 #include "ci_flash_data_info.h"
 // #include "ci130x_audio_capture.h"
 #include "board.h"
@@ -49,6 +47,11 @@
 #include "cias_network_msg_protocol.h"
 #include "timers.h"
 #include "ci_agc.h"
+#include "user_config.h"
+#if !SIMPLE_AUDIO_PLAYER_ENABLE
+#include "audio_play_api.h"
+#include "audio_play_decoder.h"
+#endif
 /**
  * @brief 硬件初始化
  *          这个函数主要用于系统上电后初始化硬件寄存器到初始值，配置中断向量表初始化芯片io配置时钟
@@ -97,18 +100,18 @@ static void hardware_default_init(void)
  *              2.DRIVER_OS_API                     宏配置为0
  */
 static int platform_init(void)
-{
+{   
     #if CONFIG_CI_LOG_UART
     ci_log_init();      //初始化日志模块
-    #if COMMAND_LINE_CONSOLE_EN
+    #if COMMAND_LINE_CONSOLE_EN         
     vUARTCommandConsoleStart( 256, 4);
     #endif
     #endif
     #if (CONFIG_CI_LOG_UART == UART_PROTOCOL_NUMBER && MSG_COM_USE_UART_EN)
 	CI_ASSERT(0,"Log uart and protocol uart confict!\n");
     #endif
-
-    #if CONFIG_SYSTEMVIEW_EN
+    
+    #if CONFIG_SYSTEMVIEW_EN   
     /* 初始化SysView RTT，仅用于调试 */
 	SEGGER_SYSVIEW_Conf();
 	/* 使用串口方式输出sysview信息 */
@@ -163,13 +166,13 @@ static int alg_model_init(void)
     #if USE_WMAN_VPR
     vpr_init(NULL); 
     #endif
-    #if USE_DENOISE_NN
-    get_ci_ai_denoise_model_addr();
+    #if USE_NN_DENOISE
+    get_ci_nn_denoise_model_addr();
     #endif
-    #if USE_AI_DOA
-    get_ci_ai_doa_model_addr();
+    #if USE_NN_DOA
+    get_ci_nn_doa_model_addr();
     #if !USE_AEC_MODULE
-    REMOTE_CALL(set_doa_out_type(AI_DOA_OUT_TYPE));
+    REMOTE_CALL(set_doa_out_type(NN_DOA_OUT_TYPE));
     #endif
     #endif
     #if USE_SED  
@@ -192,164 +195,81 @@ static int alg_cloud_protocol_init(void)
         cry_cloud_cmd_init_call();
     #elif USE_SED_SNORE
         snore_cloud_cmd_init_call();
-    #elif USE_AI_DOA
+    #elif USE_NN_DOA     
         doa_cloud_cmd_init_call();
     #endif
     return 0;
 }
 #endif
-
-static void task_init(void *p_arg)
+//双核交互参数初始化
+static void ciss_param_init(void)
 {
-
-	#if USE_BLE
-    ble_xtal_init();
-    welcome();                   //231x蓝牙版本信息打印延后
-    #endif
-	#if USE_DENOISE_NN&&USE_DUAL_MIC_ANY&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_ANY_MIC_AEC_DENOISE_NN_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_ANY_MIC_AEC_DENOISE_NN_END_ADDR);
-    #elif USE_DENOISE_NN&&USE_AI_DOA&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_DOA_AEC_DENOISE_NN_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_DOA_AEC_DENOISE_NN_END_ADDR);
-    #elif USE_DENOISE_NN&&USE_AEC_MODULE&&USE_CWSL
-    extern char SDK_ALG_PRO_SRAM_HOST_CWSL_AEC_DENOISE_NN_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_CWSL_AEC_DENOISE_NN_END_ADDR);
-    #elif USE_DENOISE_NN&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_AEC_DENOISE_NN_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_AEC_DENOISE_NN_END_ADDR);
-    #elif USE_CWSL&&USE_AI_DOA&&USE_DEREVERB_MODULE&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_CWSL_DOA_DEREVERB_AEC_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_CWSL_DOA_DEREVERB_AEC_END_ADDR);
-    #elif USE_AI_DOA&&USE_DEREVERB_MODULE&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_DOA_DEREVERB_AEC_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_DOA_DEREVERB_AEC_END_ADDR);
-    #elif USE_CWSL&&USE_AI_DOA&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_CWSL_DOA_AEC_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_CWSL_DOA_AEC_END_ADDR);
-    #elif USE_CWSL&&USE_DUAL_MIC_ANY&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_CWSL_ANY_MIC_AEC_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_CWSL_ANY_MIC_AEC_END_ADDR);
-    #elif USE_BEAMFORMING_MODULE&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_BF_AEC_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_BF_AEC_END_ADDR);
-    #elif USE_BEAMFORMING_MODULE && USE_DEREVERB_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_BF_DEREVERB_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_BF_DEREVERB_END_ADDR);
-    #elif USE_AI_DOA&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_DOA_AEC_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_DOA_AEC_END_ADDR);
-    #elif USE_AI_DOA&&USE_DEREVERB_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_DOA_DEREVERB_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_DOA_DEREVERB_END_ADDR);
-	#elif USE_DEREVERB_MODULE&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_DEREVERB_AEC_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_DEREVERB_AEC_END_ADDR);
-    #elif USE_CWSL&&USE_AI_DOA
-    extern char SDK_ALG_PRO_SRAM_HOST_CWSL_DOA_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_CWSL_DOA_END_ADDR);
-    #elif USE_CWSL&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_CWSL_AEC_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_CWSL_AEC_END_ADDR);
-    #elif USE_DUAL_MIC_ANY&&USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_ANY_MIC_AEC_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_ANY_MIC_AEC_END_ADDR);
-    #elif USE_BEAMFORMING_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_BF_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_BF_END_ADDR);
-    #elif USE_CWSL
-    extern char SDK_ALG_PRO_SRAM_HOST_CWSL_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_CWSL_END_ADDR);
-    #elif USE_DENOISE_NN
-    extern char SDK_ALG_PRO_SRAM_HOST_DENOISE_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_DENOISE_END_ADDR);
-    #elif USE_AI_DOA
-    extern char SDK_ALG_PRO_SRAM_HOST_DOA_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_DOA_END_ADDR);
-    #elif USE_VPR
-    extern char SDK_ALG_PRO_SRAM_HOST_VPR_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_VPR_END_ADDR);
-    #elif USE_WMAN_VPR
-    extern char SDK_ALG_PRO_SRAM_HOST_WMANVPR_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_WMANVPR_END_ADDR);
-    #elif USE_SED
-    extern char SDK_ALG_PRO_SRAM_HOST_SED_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_SED_END_ADDR);
-     #elif USE_TTS
-    extern char SDK_ALG_PRO_SRAM_HOST_TTS_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_TTS_END_ADDR);
-    #elif USE_AEC_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_AEC_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_AEC_END_ADDR);
-    #elif USE_DEREVERB_MODULE
-    extern char SDK_ALG_PRO_SRAM_HOST_DEREVERB_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_DEREVERB_END_ADDR);
+    ciss_set(CI_SS_ASR_ROLL_FRM, VAD_ROLL_FRM);      //ASR回退帧数
+    #if NO_ASR_FLOW
+    ciss_set(CI_SS_ASR_EN, 0);
     #else
-    extern char SDK_ALG_PRO_SRAM_HOST_NULL_END_ADDR;
-    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_NULL_END_ADDR);
+    ciss_set(CI_SS_ASR_EN, 1);
     #endif
-    vTaskDelay(pdMS_TO_TICKS(5));       //必须延时5ms，否则识别慢
-    #if CLOUD_UART_PROTOCOL_EN
-    UARTPollingConfig((UART_TypeDef*)CLOUD_CFG_UART_PORT, CLOUD_CFG_UART_BAUND_RATE);
-    #endif
-
-    cm_init();
-
-    /* 注册录音codec */
-    audio_in_codec_registe();
-
-    nuclear_com_init();
-
-    /*各个通信组件的初始化*/
-    decoder_port_inner_rpmsg_init();
-    flash_control_inner_port_init();
-    dnn_nuclear_com_outside_port_init();
-    asr_top_nuclear_com_outside_port_init();
-    vad_fe_nuclear_com_outside_port_init();
-    flash_manage_nuclear_com_outside_port_init();
-    codec_manage_inner_port_init();
-    ciss_init();
-    ciss_set(CI_SS_DECODER_MIN_ACTIVE,DECODER_MIN_ACTIVE);
-    ciss_set(CI_SS_INTENT_NUM, MULT_INTENT);
-    #if DEEP_SEPARATE_ENABLE
-    ciss_set(CI_SS_CHA_NUM, 2);
+    #if USE_CWSL   //开启自学习
+    ciss_set(CI_SS_CWSL_EN, 1);  
     #else
-    ciss_set(CI_SS_CHA_NUM, 1);
+    ciss_set(CI_SS_CWSL_EN, 0);  
     #endif
-
-    float beam = DECODER_BEAM;
-    ciss_set(CI_SS_DECODER_BEAM,*(uint32_t*)&beam);
-	mailboxboot_sync();
-    ciss_set(CI_SS_VOX_WORK_STATE, 1);
-    ciss_set(CI_SS_NN_DENOISE_WORK_STATE, 1);
-    ciss_set(CI_SS_VOX_SET_END_CONFIDENCE, VOX_VAD_END_CONFIDENCE_DEFAULT);
-    ciss_set(CI_SS_ALG_DEBUG_STATE, 0);  //开启前端算法调试
-    extern vox_config_t vox_config;
-    uint8_t vox_thre_db = VOX_VAD_THRE_DB_DEFAULT;
-    if(vox_thre_db >= 45 && vox_thre_db <= 48)
-    {
-        mprintf("==local vad set high sensitivity\r\n");
-        vox_config.vad_start_sen = 2;     ///0-低灵敏度、1-中灵敏度、2-高灵敏度
-        vox_config.agc_gate_h = -3000.0f;
-        vox_config.agc_gate_l = -4500.0f;
-        vox_config.agc_gate_end = -2000.0f;
-    }
-    else if(vox_thre_db >= 49 && vox_thre_db <= 52)
-    {
-        mprintf("===local vad set middle sensitivity\r\n");
-        vox_config.vad_start_sen = 1;
-        vox_config.agc_gate_h = -4000.0f;
-        vox_config.agc_gate_l = -6500.0f;
-        vox_config.agc_gate_end = -3000.0f;
-    }
-    else if(vox_thre_db >= 53 && vox_thre_db <= 60)
-    {
-        mprintf("===local vad  set low sensitivity\r\n");
-        vox_config.vad_start_sen = 0;
-        vox_config.agc_gate_h = -5500.0f;
-        vox_config.agc_gate_l = -8000.0f;
-        vox_config.agc_gate_end = -4500.0f;
-    }
+    #if USE_NN_DENOISE  //开启NN降噪
+    ciss_set(CI_SS_NN_DENOISE_EN, 1);
+    #else
+    ciss_set(CI_SS_NN_DENOISE_EN, 0);
+    #endif
+    #if USE_TRA_DENOISE  //开启传统降噪
+    ciss_set(CI_SS_TRA_DENOISE_EN, 1);
+    #else
+    ciss_set(CI_SS_TRA_DENOISE_EN, 0);
+    #endif
+    #if USE_NN_VAD  //开启USE_NN_VAD
+    ciss_set(CI_SS_NN_VAD_EN, 1);
+    #else
+    ciss_set(CI_SS_NN_VAD_EN, 0);
+    #endif
+    
+    #if USE_NN_DOA
+    ciss_set(CI_SS_NN_DOA_EN, 1);
+    #else
+    ciss_set(CI_SS_NN_DOA_EN, 0);
+    #endif
+    #if USE_VPR
+    ciss_set(CI_SS_VPR_EN, 1);
+    #else
+    ciss_set(CI_SS_VPR_EN, 0);
+    #endif
+    #if USE_WMAN_VPR
+    ciss_set(CI_SS_WMAN_VPR_EN, 1);
+    #else
+    ciss_set(CI_SS_WMAN_VPR_EN, 0);
+    #endif
+    #if USE_SED
+    ciss_set(CI_SS_SED_EN, 1);
+    ciss_set(CI_SS_ASR_EN, 0);   //事件检测内存不够，不开识别
+    #else
+    ciss_set(CI_SS_SED_EN, 0);
+    #endif
+    
+    // #if USE_AEC_MODULE&&USE_NN_DOA
+    // ciss_set(CI_SS_AEC_WORK_STATE, 0);
+    // ciss_set(CI_SS_DOA_WORK_STATE, 1);
+    // ciss_set(CI_SS_DOA_INIT_STATE, 1);
+    // ciss_set(CI_SS_CUR_DOA_AEC_STATE, 1);
+    // #elif USE_AEC_MODULE
+    // ciss_set(CI_SS_DOA_WORK_STATE, 0);
+    // ciss_set(CI_SS_AEC_WORK_STATE, 1);
+    // ciss_set(CI_SS_AEC_INIT_STATE, 1);
+    // #elif USE_NN_DOA
+    // ciss_set(CI_SS_AEC_WORK_STATE, 0);
+    // ciss_set(CI_SS_DOA_WORK_STATE, 1);
+    // ciss_set(CI_SS_DOA_INIT_STATE, 1);
+    // #endif
+	ciss_set(CI_SS_VOX_WORK_STATE, 1);
+//	ciss_set(CI_SS_VOX_SET_END_CONFIDENCE, VOX_VAD_END_CONFIDENCE_DEFAULT);
+    ciss_set(CI_SS_ALG_DEBUG_STATE, 0);           //开启前端算法调试
     //注册语音前段信号处理模块
     #if USE_DUAL_MIC_ANY
     ciss_set(CI_SS_DUALMIC_IS_ANY,true);
@@ -361,35 +281,59 @@ static void task_init(void *p_arg)
     #else
     ciss_set(CI_SS_DUALMIC_IS_ANY,false);
     #endif
-    #if AUDIO_DATA_UPLOAD_BY_UART    //开启串口上传功能，打开nn vad
-    #if 0
-    ciss_set(CI_SS_NNVAD_IS_OPEN, 1);
-    extern int config_voice_end(short sil_th,short windows_len,float pre_rate);
-    config_voice_end(-699, 30, 0.5);   //范围:param2(10-100),值越小越容易检测到VAD param3(0.3~0.9)-值越小越容易检测到VAD
+     /*DNN配置*/
+    ciss_set(CI_SS_DNN_TASK_ASR_REG_EN, 1);
+    bnpu_dnn_param_cfg();
+    ciss_set(CI_SS_DNN_HOST_CFG_READY, 1);      //需要在asr,降噪等dnn功能配置完后再ready
+    ciss_set(CI_SS_AUDIO_IN_BUFFER_NUM, AUDIO_IN_BUFFER_NUM);  //2M模型，buffer至少设置为20
+    ciss_set(CI_SS_DECODER_MIN_ACTIVE, DECODER_MIN_ACTIVE);
+    #if DEEP_SEPARATE_ENABLE
+    ciss_set(CI_SS_CHA_NUM, 2);
+    #else 
+    ciss_set(CI_SS_CHA_NUM, 1);
     #endif
+    
+    float beam = DECODER_BEAM;
+    ciss_set(CI_SS_DECODER_BEAM,*(uint32_t*)&beam);
+	
+}
+static void task_init(void *p_arg)
+{
+
+    extern char SDK_ALG_PRO_SRAM_HOST_END_ADDR;
+    dsu_init((uint32_t)&SDK_ALG_PRO_SRAM_HOST_END_ADDR);
+    vTaskDelay(pdMS_TO_TICKS(5));       //必须延时5ms，否则识别慢
+    #if CLOUD_UART_PROTOCOL_EN
+    UARTPollingConfig((UART_TypeDef*)CLOUD_CFG_UART_PORT, CLOUD_CFG_UART_BAUND_RATE);
     #endif
+
+    cm_init();
+    /* 注册录音codec */
+    audio_in_codec_registe();
+
+    nuclear_com_init();
+
+    /*各个通信组件的初始化*/
+    decoder_port_inner_rpmsg_init();
+    flash_control_inner_port_init();
+    asr_top_nuclear_com_outside_port_init();
+    flash_manage_nuclear_com_outside_port_init();
+    codec_manage_inner_port_init();
+    ciss_init();
+    ciss_param_init();
+	mailboxboot_sync();   //需要放在ciss_set双核参数同步设置之后
+
+    ci_flash_data_info_init(DEFAULT_MODEL_GROUP_ID);
     extern ci_ssp_config_t ci_ssp;
     extern audio_capture_t audio_capture;
     REMOTE_CALL(set_ssp_registe(&audio_capture, (ci_ssp_st*)&ci_ssp, sizeof(ci_ssp)/sizeof(ci_ssp_st)));
     REMOTE_CALL(set_freqvad_start_para_gain(VAD_SENSITIVITY));
-
-    ci_flash_data_info_init(DEFAULT_MODEL_GROUP_ID);
+    alg_model_init();                                               //初始化算法模型
+    ciss_set(CI_SS_HOST_PARAM_SET_OK, BNPU_HOST_PARAM_SYNC_MAGIC);  //参数设置完成
     #if USER_CODE_SWITCH_ENABLE  //支持两份code动态切换
     check_code2_param();
     #endif
-    #if USE_TTS
-    get_ci_tts_model_addr();
-    audio_play_init();
-    audio_play_set_vol_gain(85);
-    sys_tts_msg_task_initial();
-    tts_module_init();
-    vTaskDelay(pdMS_TO_TICKS(10));
-    mprintf("tts init ok\r\n");
-    #else
-	#if USE_BLE
-    ble_model_init();
-    #endif
-    #if USE_CWSL
+    #if USE_CWSL 
     cwsl_set_vad_alc_config(1);
     cwsl_init();
     #endif
@@ -398,7 +342,7 @@ static void task_init(void *p_arg)
 	cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID,CM_CHA_LEFT,DISABLE);
 	cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID,CM_CHA_LEFT,25);
     #endif
-    #if !USE_SED          //事件检测不带asr
+    #if !NO_ASR_FLOW          //事件检测不带asr
     extern void decoder_task_init_port(void);
     decoder_task_init_port();
     #endif
@@ -407,9 +351,8 @@ static void task_init(void *p_arg)
     /* 播放器任务 */
     audio_play_init();
     #endif
-    alg_model_init();     //初始化算法模型
-    #if USE_AI_DOA
-    xTaskCreate(doa_out_result_hand_task, "doa_out_result_hand_task", 256, NULL, 4, NULL);
+    #if USE_NN_DOA || USE_GCC_DOA
+    xTaskCreate(doa_out_result_hand_task, "doa_out_result_hand_task", 100, NULL, 4, NULL); 
     #endif
     #if USE_SED
     sed_set_vol_init();
@@ -422,20 +365,12 @@ static void task_init(void *p_arg)
     {
         CI_ASSERT(0, "cias_online_func_init error\r\n");
     }
-    #if (MULT_INTENT > 1)
-    if (nlp_module_init() != NLP_STATE_OK) //nlp模块初始化
-    {
-        mprintf("nlp module init error...\r\n");
-        return NLP_ERR_COMMON;
-    }
-	#endif
     /*user app初始化*/
     userapp_initial();
     /* 用户任务 */
     sys_msg_task_initial();
     xTaskCreate(UserTaskManageProcess,"UserTaskManageProcess",480,NULL,4,NULL);
     
-    #endif
 #if !NO_ASR_FLOW
     extern void config_adpt_cnt(int enable);
     config_adpt_cnt(ADAPTIVE_CNT_ENABLE);
@@ -449,6 +384,9 @@ static void task_init(void *p_arg)
     config_recover_result(RECOVER_RESULT_ENABLE,RECOVER_RESULT_MODE,RECOVER_RESULT_MAX_FRM);
     extern void config_silprob_cnt(float base_silprob,int base_silcnt );
     config_silprob_cnt(DEFAULT_STOP_SILPROB, DEFAULT_STOP_SILCNT);
+
+    REMOTE_CALL(vad_rollback_frm_cfg(VAD_START_BACK_FRAMES));
+    REMOTE_CALL(vad_rollback_fast_frm_cfg(VAD_START_BACK_FRAMES_FASTER,VAD_START_BACK_FRAMES_ADAPTIVE_EN));
 #endif
     #if USER_CODE_SWITCH_ENABLE
     xTaskCreate(uart_data_handle_task,"uart_data_handle_task", 480, NULL, 4, NULL);
@@ -458,6 +396,7 @@ static void task_init(void *p_arg)
     cias_send_cmd(CIAS_AUDIO_SYS_READY, DEF_FILL); 
     while(1)
     {
+        #if !DEBUG_AUDIO_UART_UPLOAD_EN
         UBaseType_t ArraySize = 20;
         TaskStatus_t *StatusArray;
         //ArraySize = uxTaskGetNumberOfTasks();
@@ -483,6 +422,7 @@ static void task_init(void *p_arg)
             mprintf("system heap free:%dKB\n", xPortGetFreeHeapSize()/1024);
         }
         vPortFree(StatusArray);
+        #endif
         vTaskDelay(pdMS_TO_TICKS(10000));
     }
     #else
@@ -491,20 +431,18 @@ static void task_init(void *p_arg)
 }
 
 /**
- * @brief
- *
+ * @brief 
+ * 
  */
 int main(void)
 {
     hardware_default_init();
 
     /*平台相关初始化*/
-    platform_init();
+    platform_init(); 
 
     /* 版本信息 */
-    #if !USE_BLE
     welcome();
-    #endif
 
     /* 创建启动任务 */
     xTaskCreate(task_init, "init task", 280, NULL, 4, NULL);

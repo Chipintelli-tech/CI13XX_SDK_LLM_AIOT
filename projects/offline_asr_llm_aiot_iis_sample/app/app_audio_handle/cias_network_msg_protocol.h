@@ -94,10 +94,10 @@ typedef enum{
 	SET_VAD_FILTER_FRAME                =  0x010F,  /*过滤vad start和end之间帧数(16ms一帧)，小于该设定值被判断为无效语音，语音芯片不上传, 带参数2字节*/
 	SET_VAD_SENSITIVITY_ACTIVATE_LENTH  =  0x0110,  /*多长时间的静音产生vad end，带参数1字节*/
 	SET_VAD_START_MAX_TIMEOUT           =  0x0111,  /*设置vad start 最大时间，超过设置时间则强制结束上传语音，单位秒，默认5S，带参数2字节*/  
-    SET_PLAY_VOICE_ID                   =  0x0112,  /*设置离线播放音频，带参数4字节(id号)*/ 
+    SET_PLAY_VOICE_ID                   =  0x0112,  /*设置离线播放音频，带参数3字节(id号 + 是否打断)*/ 
     SET_WAKE_UP_CONTINUE_TIME           =  0x0113,  /*设置持续唤醒时间，超过设置时间，语音芯片强制退出唤醒，带参数2字节(默认15S)*/
     SET_ENTER_WAKE_UP                   =  0x0114,  /*通过指令让语音芯片进入唤醒状态，不用等待唤醒词唤醒*/
-    SET_INTERACTION_NULTI_ROUND_ENABLE =  0x0115,  /*设置单轮还是多轮，带参数1字节，0-单轮 1-多轮(默认)*/
+    SET_INTERACTION_NULTI_ROUND_ENABLE  =  0x0115,  /*设置单轮还是多轮，带参数1字节，0-单轮 1-多轮(默认)*/
     UPLOAD_PLAY_FULL_DUPLEX_EANBLE      =  0x0116,  /*设置播放音频时是否上传录音，带参数1字节 0-不上传(默认) 1-上传*/
     SET_AUDIO_VOLUME                    =  0x0117,  /*设置语音芯片音量，带参数1字节，范围(1-7), 默认7*/
     SET_AUDIO_COMPRESS_TYPE             =  0x0118,  /*压缩类型，默认只支持speex压缩，预留，暂时不做支持*/

@@ -33,7 +33,7 @@
 #include "baudrate_calibrate.h"
 #include "cias_aiot_protocol.h"
 extern CiasAiotFuncParamTypedef gCiasAiotFuncParam;
-#if USE_IR_ENABEL
+#if USE_IR_ENABLE
 #include "ir_test_protocol.h"
 extern int eut_state;
 #endif
@@ -231,13 +231,11 @@ static uint16_t data_rev_count = 0;
 
 void vmup_receive_packet(uint8_t receive_char)
 {
-
     if(true == vmup_port_timeout_one_packet())
     {
         rev_state = REV_STATE_HEAD0;
-
     }
-    //mprintf("%02x ",(uint8_t)receive_char);
+
     switch(rev_state)
     {
         case REV_STATE_HEAD0:
@@ -365,8 +363,6 @@ void vmup_receive_packet(uint8_t receive_char)
 /********************************************************************
                      send function
 ********************************************************************/
-
-
 static int vmup_send_packet(sys_msg_com_data_t * msg)
 {
     uint16_t chk_sum;
@@ -441,7 +437,7 @@ void send_baudrate_sync_req(void)
 
 void vmup_communicate_init(void)
 {
-    #if USE_IR_ENABEL
+    #if USE_IR_ENABLE
     if(eut_state == 0)
     {
     	vmup_port_hw_init();
@@ -718,7 +714,7 @@ void userapp_deal_cmd(sys_msg_com_data_t *msg)
                 /*play voice*/
                 if (VMUP_MSG_DATA_PLAY_BY_SEMANTIC_ID == play_setting)
                 {
-                    #if USE_IR_ENABEL
+                    #if USE_IR_ENABLE
                         #if UART_CONTOR_SEND_IR
                             //调用接口发送红外，参数填对应的语义ID，就可像语音识别后一样发红对应指令的红外了
                             userapp_deal_com_msg_semantic_id(id);
@@ -883,7 +879,7 @@ void userapp_deal_com_msg(sys_msg_com_data_t *msg)
         case VMUP_MSG_TYPE_CMD_DOWN:
             userapp_deal_cmd(msg);
             break;
-        #if USE_IR_ENABEL
+        #if USE_IR_ENABLE
             #if (IR_TEST == 1)		
             case VMUP_MSG_TYPE_TEST:
             userapp_test_cmd(msg);

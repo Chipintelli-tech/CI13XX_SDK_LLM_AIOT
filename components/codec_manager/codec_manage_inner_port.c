@@ -12,8 +12,8 @@
 #define CMI_CI_ASSERT(x,msg)                                                                                                    \
     if( ( x ) == 0 )                                                                                                        \
     {                                                                                                                       \
-        mprintf("%s",msg);                                                                                                   \
-        mprintf("CMI Line:%d\n",__LINE__);                                                                                   \
+        ci_logdebug(LOG_SYS_INFO, "%s",msg);                                                                                                   \
+        ci_logdebug(LOG_SYS_INFO, "CMI Line:%d\n",__LINE__);                                                                                   \
         while(1)  asm volatile ("ebreak");                                                                                  \
     }
 
@@ -22,16 +22,10 @@ uint32_t codec_manage_inner_msg_buf[CODEC_MANAGE_INNER_PORT_MAX_PARA_NUM] = {0};
 
 int32_t codec_manage_inner_serve_cb(void *payload, uint32_t payload_len, uint32_t src, void *priv)
 {
-    // if(payload_len > sizeof(codec_manage_inner_msg_buf))
-    // {
-    //     // mprintf("payload_len = %d\n",payload_len);
-    //     CMI_CI_ASSERT(0,"\n");
-    // }
-    // MASK_ROM_LIB_FUNC->newlibcfunc.memcpy_p((void*)codec_manage_inner_msg_buf,(void*)payload,payload_len);
     uint32_t* data = (uint32_t*)payload;
     
     #if THIS_MODULE_PRINT_OPEN
-    mprintf("NN I %d\n",data[0]);
+    ci_logdebug(LOG_SYS_INFO, "NN I %d\n",data[0]);
     #endif
     switch(data[0])
     {
@@ -40,7 +34,7 @@ int32_t codec_manage_inner_serve_cb(void *payload, uint32_t payload_len, uint32_
             #if CHECK_PARA_NUM
             if(12 != payload_len)
             {
-                mprintf("payload_len = %d\n",payload_len);
+                ci_logdebug(LOG_SYS_INFO, "payload_len = %d\n",payload_len);
                 CMI_CI_ASSERT(0,"\n");
             }
             #endif
@@ -57,7 +51,7 @@ int32_t codec_manage_inner_serve_cb(void *payload, uint32_t payload_len, uint32_
             #if CHECK_PARA_NUM
             if(16 != payload_len)
             {
-                mprintf("payload_len = %d\n",payload_len);
+                ci_logdebug(LOG_SYS_INFO, "payload_len = %d\n",payload_len);
                 CMI_CI_ASSERT(0,"\n");
             }
             #endif
@@ -72,7 +66,7 @@ int32_t codec_manage_inner_serve_cb(void *payload, uint32_t payload_len, uint32_
             #if CHECK_PARA_NUM
             if(16 != payload_len)
             {
-                mprintf("payload_len = %d\n",payload_len);
+                ci_logdebug(LOG_SYS_INFO, "payload_len = %d\n",payload_len);
                 CMI_CI_ASSERT(0,"\n");
             }
             #endif
@@ -97,7 +91,7 @@ int32_t codec_manage_inner_serve_cb(void *payload, uint32_t payload_len, uint32_
             #if CHECK_PARA_NUM
             if(12 != payload_len)
             {
-                mprintf("payload_len = %d\n",payload_len);
+                ci_logdebug(LOG_SYS_INFO, "payload_len = %d\n",payload_len);
                 CMI_CI_ASSERT(0,"\n");
             }
             #endif
@@ -114,7 +108,7 @@ int32_t codec_manage_inner_serve_cb(void *payload, uint32_t payload_len, uint32_
             #if CHECK_PARA_NUM
             if(8 != payload_len)
             {
-                mprintf("payload_len = %d\n",payload_len);
+                ci_logdebug(LOG_SYS_INFO, "payload_len = %d\n",payload_len);
                 CMI_CI_ASSERT(0,"\n");
             }
             #endif

@@ -17,7 +17,7 @@
 #include <stdbool.h>
 #include "ci130x_uart.h"
 #include "sdk_default_config.h"
-
+#include "user_config.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,14 +30,12 @@ extern "C" {
 
 #define COMMAND_INFO_FILE_ID            60000
 #define VOICE_VPR_DNN_ID                60001   //声纹模型
-#define CI_AI_CRY_MODEL_ID              60002   //哭声检测模型
-#define CI_AI_DENOISE_MODEL_ID          60003   //NN降噪模型
-#define CI_AI_DOA_MODEL_ID              60004   //NN DOA声源定位模型
-#define CI_AI_SNORE_MODEL_ID            60005   //鼾声检测模型
-#define CI_AI_RTC_MODEL_ID              60006   //通話降噪模型
+#define CI_NN_CRY_MODEL_ID              60002   //哭声检测模型
+#define CI_NN_DENOISE_MODEL_ID          60003   //NN降噪模型
+#define CI_NN_DOA_MODEL_ID              60004   //NN DOA声源定位模型
+#define CI_NN_SNORE_MODEL_ID            60005   //鼾声检测模型
+#define CI_NN_RTC_MODEL_ID              60006   //通話降噪模型
 #define VOICE_WMAN_MODEL_ID             60008   //男女声纹
-#define CI_AI_TTS_ACU_MODEL_ID          60009   //TTS模型-acu算声学模型
-#define CI_AI_TTS_DUR_MODEL_ID          60010   //TTS模型-dur算时长模型
 
 
 

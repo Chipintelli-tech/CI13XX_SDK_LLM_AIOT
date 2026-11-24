@@ -20,7 +20,7 @@ extern "C"
 #endif
 
 
-#if CONFIG_DEBUG_EN
+#if CONFIG_DEBUG_EN && !SDK_RELEASE_EN
 #define DEBUG_TIMER_INIT()     init_timer0()
 #define DEBUG_TIMER_START()    timer0_start_count()
 #define DEBUG_TIMER_END(x)     timer0_end_count(x)
