@@ -41,8 +41,6 @@ typedef struct
 bool network_send_task_init(void);
 void network_send_data_task(void *p_arg);
 
-int voice_data_packet_and_send(uint32_t packet_type,uint8_t *voice_data, int32_t packet_len);
-
 BaseType_t send_msg_to_network_task(sdio_task_msg_t *send_msg,BaseType_t *xHigherPriorityTaskWoken);
 
 int32_t broadlink_frame_create(uint32_t type, const uint8_t *input, uint32_t len,uint8_t *output, uint32_t maxsize,uint32_t fill_data,uint16_t index);
@@ -50,7 +48,6 @@ int32_t cias_send_cmd(uint32_t cmd, uint32_t fill_data);
 int32_t cias_send_cmd_and_data(uint32_t cmd_type, uint8_t *buf, int32_t len, uint32_t fill_data);
 // int cais_send_msg_flag_to_network(sDataPoint *p);
 int cais_send_msg_flag_to_network(int8_t *send_buffer);
-int cias_cjson_packet_and_send(uint32_t packet_type,uint8_t *data, int32_t packet_len);
 
 #ifdef __cplusplus
 }

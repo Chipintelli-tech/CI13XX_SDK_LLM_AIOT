@@ -106,6 +106,8 @@ typedef enum{
     SET_AUDIO_STOP_RECORD               =  0x011B,   /*通过指令结束录音(和SET_AUDIO_START_RECORD必须配对使用)*/
     SET_CLOUD_ANS_TIMEOUT_EXIT          =  0x011C,   /*设置退出云端响应超时*/
 	SET_FORCE_VAD_END                   =  0x011D,   /*强制设置VAD结束*/   
+    SET_VAD_MAX_TIMEOUT_ENABLE          =  0x011E,   /*设置vad start 最大时间使能，超过设置时间则强制结束上传语音，带参数1字节，1-使能，0-关闭*/  
+    SET_VAD_MIN_SPEECH_DB               =  0x011F,   /*最小人声能量,根据mic增益调增,推荐范围35db~50db*/ 
     //网络播放相关
     NET_PLAY_START                      =  0x0201,   /*开始播放 */
     NET_PLAY_PAUSE                      =  0x0202,   /*播放暂停 */

@@ -56,7 +56,6 @@ int32_t post_spic_read_unique_id_int(char* buf);
 
 bool get_nn_and_flash_task_state(void);
 
-void req_cinn_clear(void);
 void cinn_wait_clear_done(void);
 
 extern volatile int sys_err_flag;

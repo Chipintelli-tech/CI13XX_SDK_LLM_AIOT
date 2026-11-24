@@ -2137,7 +2137,7 @@ void task_audio_play(void *pvParameters)
         case AUDIO_PLAY_STATE_PLAYING:
         {
 #if NET_AUDIO_PLAY_BY_OPUS
-            vTaskDelay(pdMS_TO_TICKS(1));   //该处必须加延时，否则本地opus播放失败
+            vTaskDelay(1);   //该处必须加延时，否则本地opus播放失败
 #else
             // gpio_set_output_level_single(PA, pin_0, 0);
             uxBits = audio_play_event_group_wait_bits(audio_play_cmd_event_group, AUDIO_PLAY_EVENT_PAUSE | AUDIO_PLAY_EVENT_PLAY_TIMEOUT | AUDIO_PLAY_EVENT_STOP | AUDIO_PLAY_EVENT_ONE_BUF_DONE, AUDIO_PLAY_OS_SUCCESS, AUDIO_PLAY_OS_FAIL, audio_play_os_block);

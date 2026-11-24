@@ -5,7 +5,6 @@
 #include "FreeRTOS.h"
 #include <stdbool.h>
 #include "ci130x_system.h"
-#define PCM_FRAME_SIZE          (512)
 typedef enum
 {
     SAP_DATA_SRC_FLASH,         /*!< 从FLASH读取源数据 */

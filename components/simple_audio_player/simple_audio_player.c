@@ -16,24 +16,19 @@
 #include "status_share.h"
 #include "cias_aiot_protocol.h"
 #include "cias_network_msg_protocol.h"
-#if NET_AUDIO_PLAY_BY_G722
-#define SAP_SOURCE_DATA_BUF_SIZE 160
-#elif NET_AUDIO_PLAY_BY_PCM
-#define SAP_SOURCE_DATA_BUF_SIZE (1024 * 2)
-#elif NET_AUDIO_PLAY_BY_MP3
-#define SAP_SOURCE_DATA_BUF_SIZE (1024) //比特率大于128kbps，建议使用2048
-#else
-#define SAP_SOURCE_DATA_BUF_SIZE (160)
-#endif
 
-#define SAP_MAX_PCM_FRAME_SIZE (2048)
+// #define SAP_MAX_PCM_FRAME_SIZE (2048)
+
 #define SAP_MSG_QUEUE_LENGTH 10
 #define SAP_PCM_BUF_COUNT 4
 SemaphoreHandle_t fetch_sem =NULL;
 extern CiasAiotFuncParamTypedef gCiasAiotFuncParam;
 extern CiasAiotRunParamTypedef gCiasAiotRunParam;
-
-#if  AUDIO_PLAYER_ENABLE
+#if SAP_FIX_DEVICE_POP_ENABLE
+static int32_t last_gain = 0;
+static int32_t smp_current_gain = 0;    //保存当前播放音量，用于播放开始和停止时的淡入、淡出
+#endif
+#if  AUDIO_PLAYER_ENABLE || NET_AUDIO_PLAY_BY_MP3
 uint32_t total_bytes = 0;
 int id3v2_size = 0;
 uint32_t gap_index = 0;
@@ -72,6 +67,7 @@ typedef struct
     short *pcm_buffer;
     // uint32_t source_file_bytes_left;
     uint32_t source_buf_bytes_left;
+    uint8_t decode_err_count;
     uint32_t source_buf_offset;
     uint32_t decode_frame_count;
     // uint32_t source_frame_size;
@@ -168,18 +164,14 @@ void sap_stop()
     #endif
     sap_msg_t msg;
     msg.msg_id = SAP_MSG_STOP_PLAY;
-    while (sap_info.decode_frame_count < 8 && sap_info.state != SAP_STATE_IDLE)
+    uint8_t timeout_cnt = 0;
+    while (sap_info.decode_frame_count < 8 && sap_info.state != SAP_STATE_IDLE && timeout_cnt<100)
     {
+        timeout_cnt++;
         vTaskDelay(1);
     }
     sap_send_msg(&msg, NULL);
     vTaskDelay(2);
-
-    // while(sap_info.state != SAP_STATE_IDLE)
-    // {
-    //     mprintf("zt test3\r\n");
-    //     vTaskDelay(100);
-    // }
 }
 
 /**
@@ -189,7 +181,17 @@ void sap_stop()
  */
 void audio_play_set_vol_gain(int32_t gain)
 {
+    //ci_loginfo(LOG_USER,"\n gain=%02X\n",gain)
+    #if SAP_FIX_DEVICE_POP_ENABLE
+    smp_current_gain = gain;
+    if(last_gain != gain)
+    {
+        cm_set_codec_dac_gain(PLAY_CODEC_ID, 0, gain);
+        last_gain = gain;
+    }
+    #else
     cm_set_codec_dac_gain(PLAY_CODEC_ID, 0, gain);
+    #endif
 }
 
 /**
@@ -203,6 +205,12 @@ void audio_play_hw_pa_da_ctl(FunctionalState cmd, bool is_control_pa)
     // PA的操作需要在DAC关闭的情况下进行，不然会影响采音
     if (ENABLE == cmd)
     {
+        #if SAP_FIX_DEVICE_POP_ENABLE
+        //打开DAC/功放之前，先把DAC增益压到0（静音），避免DAC使能、功放开启时的电平跳变被放大成pop音；
+        //等真正的音频数据从0幅值淡入后再恢复音量（在smp_decode_one_frame中恢复）
+        cm_set_codec_dac_gain(PLAY_CODEC_ID, 0, 0);
+        last_gain = 0;
+        #endif
         icodec_start(CODEC_OUTPUT);
         if (is_control_pa)
         {
@@ -333,7 +341,7 @@ static int sap_start_play_inner(sap_msg_t *msg)
             break;
         }
         #endif
-        #if  AUDIO_PLAYER_ENABLE
+        #if  AUDIO_PLAYER_ENABLE || NET_AUDIO_PLAY_BY_MP3
         total_bytes = 0;
         id3v2_size = 0;
         gap_index = 0;
@@ -363,10 +371,10 @@ static int sap_start_play_inner(sap_msg_t *msg)
         sap_info.mp3_one_frame_size = 0;
         #endif
         sap_info.frame_pcm_size = sap_info.output_samples * sizeof(short);
-        if (sap_info.frame_pcm_size > SAP_MAX_PCM_FRAME_SIZE)
-        {
-            ci_logerr(LOG_AUDIO_PLAY, "pcm frame size %d too large!\n", sap_info.frame_pcm_size);
-        }
+        // if (sap_info.frame_pcm_size > SAP_MAX_PCM_FRAME_SIZE)
+        // {
+        //     ci_logerr(LOG_AUDIO_PLAY, "pcm frame size %d too large!\n", sap_info.frame_pcm_size);
+        // }
 
         cm_pcm_buffer_info_t pcm_buffer_info;
         pcm_buffer_info.play_buffer_info.block_num = 2;
@@ -431,7 +439,60 @@ static void wait_codec_play_finish()
         vTaskDelay(1);
     }
 }
+#if SAP_FIX_DEVICE_POP_ENABLE
+/**
+ * @brief 对送入硬件播放的第一帧PCM数据做线性淡入，避免音频从非0幅值突然开始产生pop音
+ * 
+ * @param pcm_buf 一帧PCM数据的首地址
+ */
+static void smp_fade_in_first_frame(void *pcm_buf)
+{
+    if (0 == sap_info.sample_rate || 0 == sap_info.channels || 0 == sap_info.output_samples)
+    {
+        return;
+    }
 
+    uint32_t ramp_points = sap_info.sample_rate / 200;      //5ms的淡入时间
+    uint32_t total_points = sap_info.output_samples / sap_info.channels;
+    if (ramp_points > total_points)
+    {
+        ramp_points = total_points;
+    }
+
+    int16_t *pcm = (int16_t *)pcm_buf;
+    for (uint32_t i = 0; i < ramp_points; i++)
+    {
+        for (uint32_t ch = 0; ch < sap_info.channels; ch++)
+        {
+            pcm[i * sap_info.channels + ch] =
+                (int16_t)((int32_t)pcm[i * sap_info.channels + ch] * (int32_t)i / (int32_t)ramp_points);
+        }
+    }
+}
+
+/**
+ * @brief 停止/打断播放前，把DAC增益分档平滑降到0（淡出），避免音频信号被瞬间切断产生pop音
+ * 
+ */
+static void smp_fade_out_and_mute(void)
+{
+    if (smp_current_gain > 0)
+    {
+        int32_t step = (smp_current_gain + 15) / 16;    //约16步降完，总时长十几ms
+        if (step < 1)
+        {
+            step = 1;
+        }
+        for (int32_t gain = smp_current_gain; gain > 0; gain -= step)
+        {
+            cm_set_codec_dac_gain(PLAY_CODEC_ID, 0, gain);
+            vTaskDelay(1);
+        }
+    }
+    cm_set_codec_dac_gain(PLAY_CODEC_ID, 0, 0);
+    last_gain = 0;
+}
+#endif
 /**
  * @brief Decode one frame.
  *
@@ -516,7 +577,7 @@ static int sap_decode_one_frame(void)
                 if (src_type == SAP_DATA_SRC_STREAM)
 #endif   
                 {
-                    if(sap_info.source_buf_bytes_left >= PCM_FRAME_SIZE || gCiasAiotRunParam.cloud_play_state != CLOUD_DATA_PLAYING)
+                    if(sap_info.source_buf_bytes_left >= NET_AUDIO_PCM_FRAME_SIZE || gCiasAiotRunParam.cloud_play_state != CLOUD_DATA_PLAYING)
                     break;
                 }
 #if AUDIO_PLAYER_ENABLE
@@ -571,7 +632,22 @@ static int sap_decode_one_frame(void)
         }
     }
 
-    cm_get_pcm_buffer(PLAY_CODEC_ID, &pcm_buf, portMAX_DELAY);
+    #if SAP_FIX_DEVICE_POP_ENABLE
+    if(sap_info.decode_frame_count > SAP_DISCARD_FRAME_NUM)
+    {
+        cm_get_pcm_buffer(PLAY_CODEC_ID, &pcm_buf, portMAX_DELAY);
+    }
+    else
+    {
+        pcm_buf = (uint32_t)((void*)pvPortMalloc(sap_info.frame_pcm_size));
+        if(pcm_buf == NULL)
+        {
+            mprintf("not enough memory\n");
+        }
+    }
+    #else
+        cm_get_pcm_buffer(PLAY_CODEC_ID, &pcm_buf, portMAX_DELAY);
+    #endif
     int32_t err = sap_info.cur_decoder->decode_one_frame(sap_info.decoder_handle, &sap_info.source_data_buf[sap_info.source_buf_offset], &bytes_left, (void *)pcm_buf, 0); // Decode a frame.
    // ci_logwarn(LOG_AUDIO_PLAY, "audio decorde err %d,bytes_left %d\n", err, bytes_left);
     #if NET_AUDIO_PLAY_BY_MP3
@@ -586,30 +662,101 @@ static int sap_decode_one_frame(void)
     #endif
     if (0 == err)
     {
-        if (bytes_left >= 0)
+        #if SAP_FIX_DEVICE_POP_ENABLE
+        if(sap_info.decode_frame_count > SAP_DISCARD_FRAME_NUM)
         {
-            cm_write_codec(PLAY_CODEC_ID, (void *)pcm_buf, portMAX_DELAY);
+            if((SAP_DISCARD_FRAME_NUM + 1) == sap_info.decode_frame_count)
+            {
+                mprintf("smp_fade_in_first_frame\r\n");
+                //送入硬件播放的第一帧数据做淡入，避免音频起始的pop音
+                smp_fade_in_first_frame((void*)pcm_buf);
+            }
+        #endif
+            if (bytes_left >= 0)
+            {
+                cm_write_codec(PLAY_CODEC_ID, (void *)pcm_buf, portMAX_DELAY);
+            }
+            else
+            {
+                cm_release_pcm_buffer(PLAY_CODEC_ID, CODEC_OUTPUT, (void *)pcm_buf);
+                bytes_left = 0;
+            }
+        #if SAP_FIX_DEVICE_POP_ENABLE
         }
         else
         {
-            cm_release_pcm_buffer(PLAY_CODEC_ID, CODEC_OUTPUT, (void *)pcm_buf);
-            bytes_left = 0;
+            //播放开头的预热帧直接丢弃，不送DAC播放
+            vPortFree((void*)pcm_buf);
         }
+        #endif
+
         int bytes_used = sap_info.source_buf_bytes_left - bytes_left;
         sap_info.source_buf_bytes_left = bytes_left;
         sap_info.source_buf_offset += bytes_used;
         sap_info.decode_frame_count += 1;
+        sap_info.decode_err_count = 0;
+        #if SAP_FIX_DEVICE_POP_ENABLE
+        if (sap_info.decode_frame_count == SAP_DISCARD_FRAME_NUM+2)
+        #else
         if (sap_info.decode_frame_count == 3)
+        #endif
         {
+            // mprintf("\r\n-----start_codec\r\n");
             cm_start_codec(PLAY_CODEC_ID, CODEC_OUTPUT);
             cm_set_codec_mute(PLAY_CODEC_ID, CODEC_OUTPUT, 3, DISABLE);
+            #if SAP_FIX_DEVICE_POP_ENABLE
+            //此时音频数据已从0幅值淡入，恢复DAC增益不会产生阶跃声
+            cm_set_codec_dac_gain(PLAY_CODEC_ID, 0, smp_current_gain);
+            last_gain = smp_current_gain;
+            #endif
         }
         ret = 1;
     }
     else
     {
+        // mprintf("audio decorde err %d,bytes_left %d\n", err, bytes_left);
         cm_release_pcm_buffer(PLAY_CODEC_ID, CODEC_OUTPUT, (void *)pcm_buf);
-        wait_codec_play_finish();
+
+        #if NET_AUDIO_PLAY_BY_MP3
+        //MP3帧错误,都先跳解码消耗的字节，进行重同步, 不要直接结束播放
+        if(gCiasAiotRunParam.cloud_play_state == CLOUD_DATA_PLAYING)
+        {
+            ret = 1;
+            if (bytes_left < 0 ) 
+            {
+                bytes_left = 0;
+            }
+            int bytes_used = sap_info.source_buf_bytes_left - bytes_left; 
+            sap_info.source_buf_offset += bytes_used;
+            sap_info.source_buf_bytes_left = bytes_left; 
+
+            if (++sap_info.decode_err_count > MP3_MAX_DECODE_ERR)
+            { 
+                #if SAP_FIX_DEVICE_POP_ENABLE
+                if(sap_info.decode_frame_count >= SAP_DISCARD_FRAME_NUM+2)
+                #else
+                if(sap_info.decode_frame_count >= 3)
+                #endif
+                {
+                    wait_codec_play_finish();
+                }
+                ret = 0;//错帧超过SAP_MAX_DECODE_ERR次停止播放器
+            } 
+            // 立即重试，让 MP3FindSyncWord 找下一个真同步字
+        }
+        else
+        #endif
+        {
+            #if SAP_FIX_DEVICE_POP_ENABLE
+            if(sap_info.decode_frame_count >= SAP_DISCARD_FRAME_NUM+2)
+            #else
+            if(sap_info.decode_frame_count >= 3)
+            #endif
+            {
+                wait_codec_play_finish();
+            }
+        }
+
         //ci_logwarn(LOG_AUDIO_PLAY, "audio decode err %d,bad frame!\n", err);
     }
     return ret;
@@ -618,7 +765,10 @@ static int sap_decode_one_frame(void)
 static int sap_stop_play_inner(int32_t play_cb_state)
 {
     int ret = 0;
-
+    #if SAP_FIX_DEVICE_POP_ENABLE
+    //停止/打断播放前先把音量平滑淡出，再静音和关闭codec，避免信号被瞬间切断产生pop音
+    smp_fade_out_and_mute();
+    #endif
     cm_set_codec_mute(PLAY_CODEC_ID, CODEC_OUTPUT, 3, ENABLE);
     cm_stop_codec(PLAY_CODEC_ID, CODEC_OUTPUT);
     sap_info.cur_decoder->deinit(sap_info.decoder_handle);
@@ -638,11 +788,26 @@ static int sap_stop_play_inner(int32_t play_cb_state)
         cias_send_cmd(LOCAL_AUDIO_PLAY_STOP, DEF_FILL);
     }
 
-    if(CI_SS_PLAY_STATE_PLAYING == ciss_get(CI_SS_PLAY_STATE) && !check_combination_index_state())
+    if(CI_SS_PLAY_STATE_PLAYING == ciss_get(CI_SS_PLAY_STATE))
     {
-        ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE); // 设置播放结束
+#if USE_AEC_MODULE
+        if(src_type == SAP_DATA_SRC_FLASH && !check_combination_index_state())
+        {
+            ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE); // 设置播放结束
+        }
+        else if(src_type == SAP_DATA_SRC_STREAM)
+        {
+            ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE); // 设置播放结束
+        }
+        else
+        {
+            /*noting*/
+        }
+#else
+        ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE); // 设置播放结束
+#endif
     }
-    ci_loginfo(LOG_AUDIO_PLAY, "Play end play_cb_state =%d\r\n", play_cb_state);
+    mprintf("Play end state =%d\r\n", play_cb_state);
     if (sap_info.play_end_callback)
     {
         sap_info.play_end_callback(play_cb_state);

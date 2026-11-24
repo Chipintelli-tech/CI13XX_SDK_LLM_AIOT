@@ -10,7 +10,6 @@
 #include "status_share.h"
 #include "ci_log.h"
 #include "remote_api_for_bnpu.h"
-#include "ci_nn_manage.h"
 
 
 int ci_doa_deal_for_application(void *doa, float **fft_in, short *mic_l)

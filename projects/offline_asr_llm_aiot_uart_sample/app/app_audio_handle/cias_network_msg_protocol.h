@@ -106,7 +106,10 @@ typedef enum{
     SET_AUDIO_STOP_RECORD               =  0x011B,   /*通过指令结束录音(和SET_AUDIO_START_RECORD必须配对使用)*/
     SET_CLOUD_ANS_TIMEOUT_EXIT          =  0x011C,   /*设置退出云端响应超时*/
 	SET_FORCE_VAD_END                   =  0x011D,   /*强制设置VAD结束*/   
-    VAD_VAILD_CHECK_RESULT              =  0x011E,   /*NN_VAD后置有效性检查结果：0-无效语音 1-有效语音*/ 
+    SET_VAD_MAX_TIMEOUT_ENABLE          =  0x011E,   /*设置vad start 最大时间使能，超过设置时间则强制结束上传语音，带参数1字节，1-使能，0-关闭*/  
+    SET_VAD_MIN_SPEECH_DB               =  0x011F,   /*最小人声能量,根据mic增益调增,推荐范围35db~50db*/ 
+    SET_VAD_VAILD_CHECK_MODE            =  0x0120,   /*VAD语音有效性检查模式（带参数1字节）：1-前置检查，等待判断语音有效后，再回退语音上传 2-后置检查，优先实时上传语音，检查有效性结果后通知WIFI端,建议关闭云端响应超时功能使能*/ 
+    VAD_VAILD_CHECK_RESULT              =  0x0121,   /*NN_VAD后置有效性检查结果：1-无效语音 2-有效语音*/ 
     //网络播放相关
     NET_PLAY_START                      =  0x0201,   /*开始播放 */
     NET_PLAY_PAUSE                      =  0x0202,   /*播放暂停 */
@@ -132,7 +135,7 @@ typedef enum{
     VAD_START_STOP_PLAY                 =  0x0216,    /*设置全双工模式下，vad start是否停止当前播放，带参数1字节，1-停止播放 0-不停止播放)*/
     LOCAL_AUDIO_PLAY_START              =  0x0217,    /*本地播放音频开始*/
     LOCAL_AUDIO_PLAY_STOP               =  0x0218,    /*本地播放音频结束*/
-
+    SET_NET_PLAY_STATE                  =  0x0219,    /*设置播放状态，带参数1字节，1-开始播报 0-播报停止)*/
     //IOT自定义协议
     QCLOUD_IOT_CMD                      =  0x0301,   /*云端IOT指令 */
     NET_VOLUME                          =  0x0302,   /*云端音量 */

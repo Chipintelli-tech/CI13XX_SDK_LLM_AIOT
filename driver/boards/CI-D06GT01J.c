@@ -167,7 +167,7 @@ void pad_config_for_power_amplifier(void)
     #endif
 }
 
-#if 1 // USE_IIC_PAD
+#if USE_IIC_PAD
 /**
  * @brief 引脚复用配置为IIC功能
  *
@@ -368,8 +368,12 @@ void board_clk_source_set(void)
 const cm_codec_hw_info_t host_mic_hw_info = 
 {
 #if !REF_IN_FROM_INNER_CODEC
-    #if AUDIO_PLAYER_ENABLE || USE_HP_OUT_PRE_RSLT_AUDIO
+    #if AUDIO_PLAYER_ENABLE || USE_HP_OUT_PRE_RSLT_AUDIO || AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_PLAY_BY_IIS
+    #if USE_IIC_PAD
     .IICx = IIC0,
+    #else
+    .IICx = IIC_NULL,
+    #endif
     .output_iis.IISx = IIS1,
     .output_iis.iis_mode_sel = IIS_MASTER,//IIS_SLAVE,//IIS_MASTER,
     .output_iis.over_sample = IIS_MCLK_FS_256,
@@ -385,18 +389,6 @@ const cm_codec_hw_info_t host_mic_hw_info =
     .output_iis.tx_cha = IIS_TX_CHANNAL_TX0,
     .output_iis.scklrck_out_en = IIS_SCKLRCK_MODENULL,//IIS_SCKLRCK_OUT,
     #endif
-#if AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_PLAY_BY_IIS
-    .IICx = IIC_NULL,
-    .output_iis.IISx = IIS1,
-    .output_iis.iis_mode_sel = IIS_MASTER,
-    .output_iis.over_sample = IIS_MCLK_FS_256,
-    .output_iis.clk_source = AUDIO_PLAY_CLK_SOURCE_IPCORE,//AUDIO_PLAY_CLK_SOURCE_INTER_RC,
-    .output_iis.mclk_out_en = IIS_MCLK_MODENULL,
-    .output_iis.iis_data_format = IIS_DF_IIS,
-    .output_iis.sck_lrck_ratio = IIS_SCK_LRCK_64,
-    .output_iis.tx_cha = IIS_TX_CHANNAL_TX0,
-    .output_iis.scklrck_out_en = IIS_SCKLRCK_MODENULL,
-#endif
 #endif
     #if AUDIO_IN_FROM_DMIC
     .input_iis.IISx = IIS2,
@@ -436,28 +428,18 @@ const cm_codec_hw_info_t host_mic_hw_info =
     .codec_gain.codec_adc_input_mode_r = INNER_CODEC_INPUT_MODE_SINGGLE_ENDED,
 #endif
 #endif
-    .codec_gain.codec_adc_mic_amp_l = INNER_CODEC_MIC_AMP_12dB,
-    .codec_gain.codec_adc_mic_amp_r = INNER_CODEC_MIC_AMP_12dB,
-    .codec_gain.pga_gain_l = 28.5f,
-    .codec_gain.pga_gain_r = 28.5f,
-#if (MIC_DIFF_SINGLE == 0)
-    .codec_gain.dig_gain_l = 1.0f,// 数字增益配置，该值加/减 1 ,数字增益加/减 1dB
-#else
-    .codec_gain.dig_gain_l = 6.0f, 
-#endif
-#if (IF_USE_ANOTHER_CODEC_TO_GET_REF)
-#if (MIC_DIFF_SINGLE == 0)
-    .codec_gain.dig_gain_r = 1.0f,
-#else
-    .codec_gain.dig_gain_r = 6.0f, 
-#endif
-#else
-#if (REF_DIFF_SINGLE == 0)
-    .codec_gain.dig_gain_r = 1.0f,
-#else 
-    .codec_gain.dig_gain_r = 6.0f,
-#endif
-#endif
+    .codec_gain.codec_adc_mic_amp_l = CODEC_ADC_MIC_AMP_L,
+    .codec_gain.codec_adc_mic_amp_r = CODEC_ADC_MIC_AMP_R,
+    #if AUTO_GET_AEC_GAIN
+    .codec_gain.pga_gain_l = AEC_PGA_GAIN_L,
+    .codec_gain.pga_gain_r = AEC_PGA_GAIN_R,
+    #else
+    .codec_gain.pga_gain_l = PGA_GAIN_L,
+    .codec_gain.pga_gain_r = PGA_GAIN_R,
+    #endif
+    .codec_gain.dig_gain_l = DIG_GAIN_L,
+    .codec_gain.dig_gain_r = DIG_GAIN_R,//数字增益配置，该值加/减 1 ,数字增益加/减 1dB
+
     .codec_if = 
     {
         .codec_init = icodec_init,
@@ -468,26 +450,6 @@ const cm_codec_hw_info_t host_mic_hw_info =
     }
 #endif
 }; 
-/**
- * @brief 播音配置参数表
- *
- */
-#if SIMPLE_AUDIO_PLAYER_ENABLE
-cm_sound_info_t audio_format_info = 
-{
-    .sample_rate = 16000,
-    .channel_flag = 2,
-    .sample_depth = IIS_DW_16BIT,
-};
-#else
-audio_format_info_t audio_format_info = 
-{
-    .samprate = 16000,
-    .nChans = 2,
-    .out_min_size = 1152,
-};
-#endif
-
 
 /**
  * @brief 录音配置参数表
@@ -516,7 +478,6 @@ void audio_in_codec_registe()
 {
     /*还应该加入codec power up的操作*/
     cm_reg_codec(HOST_MIC_RECORD_CODEC_ID, (cm_codec_hw_info_t*)&host_mic_hw_info);
-
     uint32_t block_size = 0;
     uint8_t resample_block_double = 1;
     
@@ -560,29 +521,25 @@ cm_codec_hw_info_t audio_pre_tslt_out_info =
 {
     .IICx = IIC_NULL,
     .output_iis.IISx = IIS0,
-    .output_iis.iis_mode_sel = IIS_MASTER,
-    .output_iis.over_sample = IIS_MCLK_FS_256,
-    #if !INNER_CODEC_AUDIO_IN_USE_RESAMPLE
-    .output_iis.clk_source = AUDIO_PLAY_CLK_SOURCE_OSC_OR_INEER_RC,
-    #else
-    .output_iis.clk_source = AUDIO_PLAY_CLK_SOURCE_IPCORE,
-    #endif
-    .output_iis.mclk_out_en = IIS_MCLK_OUT,
-    .output_iis.iis_data_format = IIS_DF_IIS,
-    .output_iis.sck_lrck_ratio = IIS_SCK_LRCK_64,
-    .output_iis.tx_cha = IIS_TX_CHANNAL_TX0,
-    .output_iis.scklrck_out_en = IIS_SCKLRCK_OUT,
-    #if MIC_RECORD_IIS_SELECT || IF_USE_ANOTHER_CODEC_TO_GET_REF
+    .output_iis.iis_mode_sel = IIS0_MODE,
+    .output_iis.over_sample = IIS0_OVER_SAMPLE,
+    .output_iis.clk_source = IIS0_CLK_SOURCE,
+    .output_iis.mclk_out_en = IIS0_MCLK_EN,
+    .output_iis.iis_data_format = IIS0_DATA_FORMAT,
+    .output_iis.sck_lrck_ratio = IIS0_SCK_LRCK_RATIO,
+    .output_iis.tx_cha = IIS0_TX_CHA,
+    .output_iis.scklrck_out_en = IIS0_SCK_LRCK_OUT_EN,
+    #if AUDIO_DATA_PLAY_BY_IIS || MIC_RECORD_IIS_SELECT || IF_USE_ANOTHER_CODEC_TO_GET_REF
     .input_iis.IISx = IIS0,
-    .input_iis.iis_mode_sel = IIS_MASTER,
-    .input_iis.over_sample = IIS_MCLK_FS_256,
-    .input_iis.clk_source = AUDIO_PLAY_CLK_SOURCE_IPCORE,
-    .input_iis.mclk_out_en = IIS_MCLK_OUT,
-    .input_iis.iis_data_format = IIS_DF_IIS,
-    .input_iis.sck_lrck_ratio = IIS_SCK_LRCK_64,
-    .input_iis.rx_cha = IIS_RX_CHANNAL_RX0,
-    .input_iis.outside_mclk_fre = 0,
-    .input_iis.scklrck_out_en = IIS_SCKLRCK_OUT,
+    .input_iis.iis_mode_sel = IIS0_MODE,
+    .input_iis.over_sample = IIS0_OVER_SAMPLE,
+    .input_iis.clk_source = IIS0_CLK_SOURCE,
+    .input_iis.mclk_out_en = IIS0_MCLK_EN,
+    .input_iis.iis_data_format = IIS0_DATA_FORMAT,
+    .input_iis.sck_lrck_ratio = IIS0_SCK_LRCK_RATIO,
+    .input_iis.rx_cha = IIS0_RX_CHA,
+    .input_iis.outside_mclk_fre = IIS0_OUTSIDE_MCLK_FRE,
+    .input_iis.scklrck_out_en = IIS0_SCK_LRCK_OUT_EN,
     #endif
 }; 
 
@@ -592,14 +549,9 @@ cm_codec_hw_info_t audio_pre_tslt_out_info =
  */
 static cm_sound_info_t pre_rslt_out_sound_info = 
 {
-    //重采样开启并且启用外部codec，IIS0使用32khz
-#if IF_USE_ANOTHER_CODEC_TO_GET_REF && INNER_CODEC_AUDIO_IN_USE_RESAMPLE && (AUDIO_DATA_UPLOAD_BY_IIS || USE_IIS1_OUT_PRE_RSLT_AUDIO)
-    .sample_rate = 32000,
-#else
-    .sample_rate = 16000,
-#endif
-    .channel_flag = 3,
-    .sample_depth = IIS_DW_16BIT,
+    .sample_rate = IIS0_SAMPLE_RATE,
+    .channel_flag = IIS0_TX_CHANNEL_FLAG,
+    .sample_depth = IIS0_SAMPLE_DEPTH,
 };
 static cm_sound_info_t play_sound_info = 
 {
@@ -619,12 +571,14 @@ static cm_sound_info_t play_sound_info =
  */
 void audio_pre_rslt_out_codec_init(void)
 {
-    #if IF_USE_ANOTHER_CODEC_TO_GET_REF && INNER_CODEC_AUDIO_IN_USE_RESAMPLE && (AUDIO_DATA_UPLOAD_BY_IIS || USE_IIS1_OUT_PRE_RSLT_AUDIO)
-    uint16_t block_size = AUDIO_CAP_POINT_NUM_PER_FRM * 2 * 2 * sizeof(int16_t);
-    #else
-    uint16_t block_size = AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t);
+    uint16_t block_size = 0;
+    block_size = AUDIO_CAP_POINT_NUM_PER_FRM * 2 * sizeof(int16_t);
+    #if(UP_DOWN_FLAG == 1)
+    block_size *= IIS0_BUF_NUM_RATIO;
+    #elif(UP_DOWN_FLAG == 2)
+    block_size /= IIS0_BUF_NUM_RATIO;
     #endif
-#if !IF_USE_ANOTHER_CODEC_TO_GET_REF && !MIC_RECORD_IIS_SELECT
+#if !IF_USE_ANOTHER_CODEC_TO_GET_REF && !MIC_RECORD_IIS_SELECT && !AUDIO_DATA_PLAY_BY_IIS
     cm_reg_codec(PLAY_PRE_AUDIO_CODEC_ID, (cm_codec_hw_info_t *)&audio_pre_tslt_out_info);
 #endif
 
@@ -646,7 +600,7 @@ void audio_pre_rslt_out_codec_init(void)
 #if REF_IN_FROM_INNER_CODEC
 const cm_codec_hw_info_t ref_speak_info = 
 {
-    #if AUDIO_PLAYER_ENABLE || USE_HP_OUT_PRE_RSLT_AUDIO
+    #if AUDIO_PLAYER_ENABLE || USE_HP_OUT_PRE_RSLT_AUDIO || AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_PLAY_BY_IIS
     .IICx = IIC_NULL,
     .output_iis.IISx = IIS1,
     .output_iis.iis_mode_sel = IIS_MASTER,//IIS_SLAVE,//IIS_MASTER,
@@ -663,18 +617,6 @@ const cm_codec_hw_info_t ref_speak_info =
     .output_iis.tx_cha = IIS_TX_CHANNAL_TX0,
     .output_iis.scklrck_out_en = IIS_SCKLRCK_MODENULL,//IIS_SCKLRCK_OUT,
     #endif
-#if AUDIO_DATA_PLAY_BY_UART || AUDIO_DATA_PLAY_BY_IIS
-    .IICx = IIC_NULL,
-    .output_iis.IISx = IIS1,
-    .output_iis.iis_mode_sel = IIS_MASTER,
-    .output_iis.over_sample = IIS_MCLK_FS_256,
-    .output_iis.clk_source = AUDIO_PLAY_CLK_SOURCE_IPCORE,//AUDIO_PLAY_CLK_SOURCE_INTER_RC,
-    .output_iis.mclk_out_en = IIS_MCLK_MODENULL,
-    .output_iis.iis_data_format = IIS_DF_IIS,
-    .output_iis.sck_lrck_ratio = IIS_SCK_LRCK_64,
-    .output_iis.tx_cha = IIS_TX_CHANNAL_TX0,
-    .output_iis.scklrck_out_en = IIS_SCKLRCK_MODENULL,
-#endif
 
     .input_iis.IISx = IIS1,
     .input_iis.iis_mode_sel = IIS_MASTER,
@@ -691,10 +633,19 @@ const cm_codec_hw_info_t ref_speak_info =
     .input_iis.outside_mclk_fre = 0,
     .input_iis.scklrck_out_en = IIS_SCKLRCK_MODENULL,//IIS_SCKLRCK_OUT,
 
+    #if REF_DIFF_SINGLE
+    .codec_gain.codec_adc_input_mode_l = INNER_CODEC_INPUT_MODE_SINGGLE_ENDED,
     .codec_gain.codec_adc_input_mode_r = INNER_CODEC_INPUT_MODE_SINGGLE_ENDED,
-    .codec_gain.codec_adc_mic_amp_r = INNER_CODEC_MIC_AMP_12dB,
-    .codec_gain.pga_gain_r = 28.5f,
-    .codec_gain.dig_gain_r = 6.0f,
+    #else
+    .codec_gain.codec_adc_input_mode_l = INNER_CODEC_INPUT_MODE_DIFF,
+    .codec_gain.codec_adc_input_mode_r = INNER_CODEC_INPUT_MODE_DIFF,
+    #endif
+    .codec_gain.codec_adc_mic_amp_l = CODEC_ADC_MIC_AMP_L,
+    .codec_gain.codec_adc_mic_amp_r = CODEC_ADC_MIC_AMP_R,
+    .codec_gain.pga_gain_l = PGA_GAIN_L,
+    .codec_gain.pga_gain_r = PGA_GAIN_R,
+    .codec_gain.dig_gain_l = DIG_GAIN_L,
+    .codec_gain.dig_gain_l = DIG_GAIN_R,
     .codec_if = 
     {
         .codec_init = icodec_init,
@@ -705,7 +656,7 @@ const cm_codec_hw_info_t ref_speak_info =
     }
 };
 
-const cm_sound_info_t ref_inner_codec_sound_info = {
+const cm_sound_info_t ref_dmic_codec_sound_info = {
 #if INNER_CODEC_AUDIO_IN_USE_RESAMPLE
     .sample_rate = 32000,
 #else
@@ -727,7 +678,7 @@ void ref_inner_codec_registe(void)
     resample_block_double = 2;
     #endif
 
-    if(3 == ref_inner_codec_sound_info.channel_flag)
+    if(3 == ref_dmic_codec_sound_info.channel_flag)
     {
         block_size = AUDIO_CAP_POINT_NUM_PER_FRM * sizeof(int16_t) * resample_block_double * 2;/*双通道*/
     }
@@ -745,28 +696,19 @@ void ref_inner_codec_registe(void)
     CI_ASSERT(record_buffer_info_str.record_buffer_info.pcm_buffer,"\n");
     cm_config_pcm_buffer(REF_RECORD_INNER_CODEC_ID, CODEC_INPUT, &record_buffer_info_str);
     //配置录音音频格式
-    cm_config_codec(REF_RECORD_INNER_CODEC_ID, CODEC_INPUT, (cm_sound_info_t*)&ref_inner_codec_sound_info);
+    cm_config_codec(REF_RECORD_INNER_CODEC_ID, CODEC_INPUT, (cm_sound_info_t*)&ref_dmic_codec_sound_info);
 }   
 #endif
 /************************************************************************/
-#if IF_USE_ANOTHER_CODEC_TO_GET_REF || MIC_RECORD_IIS_SELECT
+#if AUDIO_DATA_PLAY_BY_IIS ||IF_USE_ANOTHER_CODEC_TO_GET_REF || MIC_RECORD_IIS_SELECT
 /**
  * @brief 录音配置参数表
  *
  */
 const cm_sound_info_t ref_codec_sound_info = {
-    #if INNER_CODEC_AUDIO_IN_USE_RESAMPLE
-    .sample_rate = 32000,
-    #else
-    .sample_rate = 16000,
-    #endif
-    #if MIC_RECORD_IIS_SELECT//(2 == HOST_CODEC_CHA_NUM) //使用aec时需要开启双通道 mic和ref通道
-    .channel_flag = 3,          //bit[0] = 1选择左声道，bit[1]=1选择右声道，可以用或运算组合
-    #else
-    .channel_flag = 2,          //bit[0] = 1选择左声道，bit[1]=1选择右声道，可以用或运算组合
-    #endif
-
-    .sample_depth = IIS_DW_16BIT,
+    .sample_rate = IIS0_SAMPLE_RATE,
+    .channel_flag = IIS0_RX_CHANNEL_FLAG,     //bit[0] = 1选择左声道，bit[1]=1选择右声道，可以用或运算组合
+    .sample_depth = IIS0_SAMPLE_DEPTH,
 };
 /**
  * @brief 录音codec注册
@@ -782,19 +724,13 @@ void ref_in_codec_registe(void)
     cm_reg_codec(REF_RECORD_CODEC_ID, (cm_codec_hw_info_t*)&audio_pre_tslt_out_info);
 
     uint32_t block_size = 0;
-    uint8_t resample_block_double = 1;
-    
-    #if INNER_CODEC_AUDIO_IN_USE_RESAMPLE
-    resample_block_double = 2;
-    #endif
-    
     if(3 == ref_codec_sound_info.channel_flag)
     {
-        block_size = AUDIO_CAP_POINT_NUM_PER_FRM * sizeof(int16_t) * resample_block_double * 2;/*双通道*/
+        block_size = AUDIO_CAP_POINT_NUM_PER_FRM * sizeof(int16_t) * IIS0_BUF_NUM_RATIO * 2;/*双通道*/
     }
     else
     {
-        block_size = AUDIO_CAP_POINT_NUM_PER_FRM * sizeof(int16_t) * resample_block_double;/*双通道*/
+        block_size = AUDIO_CAP_POINT_NUM_PER_FRM * sizeof(int16_t) * IIS0_BUF_NUM_RATIO;/*双通道*/
     }
     //mprintf("block_size iis0 = %x\n",block_size);
     //配置录音PCM buffer
@@ -830,7 +766,7 @@ void audio_pre_rslt_out_codec_init_pa_out(void)
     cm_pcm_buffer_info_t pcm_buffer_info;
     pcm_buffer_info.play_buffer_info.block_num = 1;
     #if USE_AUDIO_UPLOAD_BY_HPOUT
-    pcm_buffer_info.play_buffer_info.buffer_num = 20;
+    pcm_buffer_info.play_buffer_info.buffer_num = 24;
     #else
     pcm_buffer_info.play_buffer_info.buffer_num = 12;
     #endif
@@ -850,5 +786,4 @@ void audio_pre_rslt_out_codec_init_pa_out(void)
     cm_config_pcm_buffer(PLAY_CODEC_ID, CODEC_OUTPUT, &pcm_buffer_info);
     //配置IIS放音音频格式
     cm_config_codec(PLAY_CODEC_ID, CODEC_OUTPUT, &play_sound_info);
-
 }

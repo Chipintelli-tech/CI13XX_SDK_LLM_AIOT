@@ -47,10 +47,11 @@ for %%i in (asr\*) do (
 )
 %TOOLS_PATH%\ci-tool-kit.exe merge asr-file -i asr
 
-@REM echo make user_code.bin
-@REM copy %TOOLS_PATH%\..\libs\libfbin_pro.a user_code\[1]code.bin
-@REM %TOOLS_PATH%\ci-tool-kit.exe merge user-file -i user_code
-@REM del user_code\[1]code.bin
+echo make user_code.bin
+@REM 算法库由工程编译时生成在本工程根目录(app 的上一级目录), 每个工程独立
+copy ..\ci130x_asr_alg_bnpu.a user_code\[1]code.bin
+%TOOLS_PATH%\ci-tool-kit.exe merge user-file -i user_code
+del user_code\[1]code.bin
 
 
 echo make dnn

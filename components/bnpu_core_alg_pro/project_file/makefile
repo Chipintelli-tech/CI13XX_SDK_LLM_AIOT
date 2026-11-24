@@ -3,11 +3,15 @@
 SDK_PATH ?= ../../..
 BUILD_DIR := build
 
-include $(SDK_PATH)/system/user_alg_config.mk
+# 算法功能配置文件: 上层工程编译时传入(即该工程 app 目录下的 user_alg_config.mk),
+# 单独编译本工程(不指定该变量)时回退到 SDK 公共配置
+#USER_ALG_CONFIG_MK ?= $(SDK_PATH)/system/user_alg_config.mk
+include $(USER_ALG_CONFIG_MK)
+# BNPU 端算法内存占用统计(与 MCU 工程共用同一套内存布局)
+include $(SDK_PATH)/utils/alg_sram_layout.mk
 include $(SDK_PATH)/utils/common_head.mk
 
 
-ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0
 ifeq ($(USE_ASR), 1)
 	C_FLAGS += -DCINN_MAX_CHA_NUM=1 -DNO_ASR_FLOW=0
 else
@@ -18,68 +22,50 @@ ifeq ($(USE_ANY_MIC), 1)
 endif
 ifeq ($(USE_AEC), 1)
 	C_FLAGS += -DUSE_AEC_MODULE=1 -DCINN_MAX_CHA_NUM=1   
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(AEC_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 ifeq ($(USE_CWSL), 1)
 	C_FLAGS += -DUSE_CWSL=1   -DASR_FE_REDUCE_MEM=1 -DCINN_MAX_CHA_NUM=1 
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(CWSL_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 ifeq ($(USE_NN_DOA), 1)
 	C_FLAGS += -DUSE_NN_DOA=1 -DASR_FE_REDUCE_MEM=1 -DOFFLINE_DUAL_MIC_ALG_SUPPORT=1 -DHOST_CODEC_CHA_NUM=2  -DCINN_MAX_CHA_NUM=1 
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(NN_DOA_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 ifeq ($(USE_GCC_DOA), 1)
 	C_FLAGS += -DUSE_GCC_DOA=1   -DASR_FE_REDUCE_MEM=1 -DOFFLINE_DUAL_MIC_ALG_SUPPORT=1 -DHOST_CODEC_CHA_NUM=2 -DCINN_MAX_CHA_NUM=1 
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(GCC_DOA_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 ifeq ($(USE_DEREVERB), 1)
 	C_FLAGS += -DOFFLINE_DUAL_MIC_ALG_SUPPORT=1 -DUSE_DEREVERB_MODULE=1 -DASR_FE_REDUCE_MEM=1 -DHOST_CODEC_CHA_NUM=2 -DCINN_MAX_CHA_NUM=1 
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(DEREVERB_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 
 ifeq ($(USE_NN_DENOISE), 1)
 	C_FLAGS += -DUSE_NN_DENOISE=1   -DCINN_MAX_CHA_NUM=1 
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(NN_DENOISE_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 
 ifeq ($(USE_NN_VAD), 1)
 	C_FLAGS += -DUSE_NN_VAD=1   
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(TVAD_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 
 
 ifeq ($(USE_TRA_DENOISE), 1)
 	C_FLAGS += -DUSE_TRA_DENOISE=1   -DCINN_MAX_CHA_NUM=1 
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(TRA_DENOISE_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 
 ifeq ($(USE_VPR), 1)  
 	C_FLAGS += -DUSE_VPR=1 -DCINN_MAX_CHA_NUM=1 -DASR_FE_REDUCE_MEM=0
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(NN_VPR_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 ifeq ($(USE_WMAN_VPR), 1)  
 	C_FLAGS += -DUSE_WMAN_VPR=1 -DCINN_MAX_CHA_NUM=1 -DASR_FE_REDUCE_MEM=0
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(NN_VPR_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 ifeq ($(USE_BF), 1) 	
 	C_FLAGS += -DDEEP_SEPARATE_ENABLE=1 -DCINN_MAX_CHA_NUM=2  -DASR_FE_REDUCE_MEM=1 -DUSE_BEAMFORMING_MODULE=1 -DOFFLINE_DUAL_MIC_ALG_SUPPORT=1 -DHOST_CODEC_CHA_NUM=2
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(BF_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 ifeq ($(USE_SED_CRY), 1) 
 	C_FLAGS += -DUSE_SED=1 -DNO_ASR_FLOW=1 -DCINN_MAX_CHA_NUM=1 -DASR_FE_REDUCE_MEM=0
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(NN_SED_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 ifeq ($(USE_SED_SNORE), 1) 
 	C_FLAGS += -DUSE_SED=1 -DNO_ASR_FLOW=1 -DCINN_MAX_CHA_NUM=1 -DASR_FE_REDUCE_MEM=0	
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(NN_SED_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
 endif
 ifeq ($(USE_IIS_RECORD), 1)
 C_FLAGS += -DUSE_IIS1_OUT_PRE_RSLT_AUDIO=1
-	ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(IIS_RECORD_USE_BNPU_SRAM_SIZE); printf '%x'  $$add )
-endif
-
-ifeq ($(USE_REF_IN_FROM_INNER_CODEC), 1)
-C_FLAGS += -DREF_IN_FROM_INNER_CODEC=1
 endif
 
 ifeq ($(USE_BF), 1)
@@ -88,26 +74,13 @@ else
 	LIBS := -lasr_bnpu_dis_deepse_v2
 endif
 
-# #�¼�����ڴ����Ĵ󣬲��ܺ�ʶ��ͬʱ����,
-# ifeq ($(USE_ASR), 1) 
-# ifneq ($(filter 1, $(USE_SED_CRY) $(USE_SED_SNORE)),)
-# 	$(error cannot support both ASR and sed)
-# endif
-# endif
-# #DOA��AEC�����ڴ�
-# ifeq ($(USE_AEC), 1)
-# ifeq ($(USE_NN_DOA), 1)
-# AEC_NN_DOA_MAX_MEM_SIZE := $(shell if [ $(NN_DOA_USE_BNPU_SRAM_SIZE) -gt $(AEC_USE_BNPU_SRAM_SIZE) ]; then echo $(AEC_USE_BNPU_SRAM_SIZE); else echo $(NN_DOA_USE_BNPU_SRAM_SIZE); fi)
-# ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let sub=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)-$(NN_DOA_USE_BNPU_SRAM_SIZE); printf '%x'  $$sub )
-# ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let sub=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)-$(AEC_USE_BNPU_SRAM_SIZE); printf '%x'  $$sub )
-# ALG_BPU_SRAM_SIZE_TOTAL_CNT := 0x$(shell let add=$(ALG_BPU_SRAM_SIZE_TOTAL_CNT)+$(AEC_NN_DOA_MAX_MEM_SIZE); printf '%x'  $$add )
-# endif
-# endif
 
-SDK_ALG_PRO_SRAM_HOST_END_ADDR := 0x$(shell let sub=$(SDK_ALG_PRO_SRAM_HOST_NOT_ALG_END_ADDR)-$(ALG_BPU_SRAM_SIZE_TOTAL_CNT); printf '%x'  $$sub )
 COMMON_LINK_LDS := ../../../utils/common.lds
 ALG_PRO_LINK_LDS := ../lds/ci130x_asr_alg_bnpu.lds
-SECONDARY_FLASH := $(SDK_PATH)/$(LIBS_PATH)/ci130x_asr_alg_bnpu.a
+# 算法库输出路径: 上层工程编译时传入该工程 app 目录下的路径, 使每个工程独立保存
+# 自己的 ci130x_asr_alg_bnpu.a; 单独编译本工程时输出到 SDK 公共库目录
+BNPU_ALG_OUT_LIB ?= $(SDK_PATH)/$(LIBS_PATH)/ci130x_asr_alg_bnpu.a
+SECONDARY_FLASH := $(BNPU_ALG_OUT_LIB)
 SECONDARY_LIST := $(BUILD_DIR)/$(PROJECT_NAME).lst
 
 LIBS += -lm
@@ -191,7 +164,8 @@ $(BUILD_DIR)/$(PROJECT_NAME).elf: $(OBJS) $(USER_OBJS) build/source_file.mk $(LI
 
 $(SECONDARY_FLASH): $(BUILD_DIR)/$(PROJECT_NAME).elf
 	@echo 'Invoking: GNU RISC-V Cross Create Flash Image'
-	mkdir -p ../firmware/user_code && $(CC_PREFIX)$(OC) -O binary "$(BUILD_DIR)/$(PROJECT_NAME).elf"  $(SECONDARY_FLASH)
+	@mkdir -p $(dir $(SECONDARY_FLASH)) ../firmware/user_code
+	$(CC_PREFIX)$(OC) -O binary "$(BUILD_DIR)/$(PROJECT_NAME).elf" "$(SECONDARY_FLASH)"
 	@echo 'Finished building: $@'
 	@echo ' '
 

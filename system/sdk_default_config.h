@@ -24,8 +24,8 @@
 
 // SDK VER
 #define SDK_VERSION                    3
-#define SDK_SUBVERSION                 0
-#define SDK_REVISION                   19
+#define SDK_SUBVERSION                 1
+#define SDK_REVISION                   12
 #define SDK_PUB_TYPE                   "Beta" //"Release"
 #define SDK_TYPE                       "LLM_AIOT"
 
@@ -103,7 +103,7 @@
 #endif
 
 
-// 使用COLOR三色彩灯灯控
+// PA控制控制
 #ifndef GS0XJ_BOARD_PA_AUTO
 #define GS0XJ_BOARD_PA_AUTO             0      //GS0XJ系列板子PA是否开启自动检测功能。0、关闭（默认低电平有效）。1、开启。    
 #endif
@@ -164,7 +164,7 @@
 #endif
 
 #ifndef DECODER_BEAM    
-#define DECODER_BEAM    (9.5f)  //最小值3.5 最大值15.5
+#define DECODER_BEAM            (9.5f)       //最小值3.5 最大值15.5
 #endif
 
 #ifndef DEFAULT_CONFIDENCE 
@@ -190,34 +190,33 @@
 #define MAX_STOP_CFD_ENABLE      (0) // 打分超过阈值提前结束功能 0 关闭 1 开启(可提升响应速度)
 #endif 
 
-#ifndef MAX_STOP_CFD_NOCNT
-#define MAX_STOP_CFD_NOCNT      (50) // MAX_STOP_CFD_ENABLE为1有效 无cnt配置的词，最大结束阈值,理论范围 [5-200],建议范围[50-150]； 
+#ifndef MAX_STOP_CFD_WITHOUT_CNT
+#define MAX_STOP_CFD_WITHOUT_CNT      (50) // MAX_STOP_CFD_ENABLE为1有效 无cnt配置的词，最大结束阈值,理论范围 [5-200],建议范围[50-150]； 
 #endif
 
-#ifndef MAX_STOP_CFD_CNT
-#define MAX_STOP_CFD_CNT        (60) // MAX_STOP_CFD_ENABLE为1有效 有cnt配置的词，最大结束阈值,至少要比 MAX_STOP_CFD_NOCNT 大,理论范围 [5-200],建议范围[50-150]；
+#ifndef MAX_STOP_CFD_WITH_CNT
+#define MAX_STOP_CFD_WITH_CNT        (60) // MAX_STOP_CFD_ENABLE为1有效 有cnt配置的词，最大结束阈值,至少要比 MAX_STOP_CFD_WITHOUT_CNT 大,理论范围 [5-200],建议范围[50-150]；
 #endif
 
 #ifndef DEFAULT_STOP_SILPROB
 #define DEFAULT_STOP_SILPROB    (0.9f) // 识别结束停顿静音概率阈值,理论范围[0-1]，值越大支持的停顿时间越长
 #endif
 
-#define VAD_ROLL_FRM            (55)   //ASR回退帧数-不可修改
 //以下宏和响应速度相关
 #ifndef DEFAULT_STOP_SILCNT
 #define DEFAULT_STOP_SILCNT     (2)  // 识别结束静音连续次数宏：识别结束停顿静音,值越大支持的停顿时间越长,理论范围 [1-200] 建议范围 [1-10]
 #endif
 
-#ifndef RECOVER_RESULT_ENABLE
-#define RECOVER_RESULT_ENABLE    (1)  //语音识别结果回收使能配置（整段语音结束，无有效结果，再回溯搜索打分满足阈值[CNT不满足]的结果）, 开启人声噪音识别率会增加，但集外误识别会提升
+#ifndef RECALL_RESULT_ENABLE
+#define RECALL_RESULT_ENABLE    (1)  //语音识别结果回收使能配置（整段语音结束，无有效结果，再回溯搜索打分满足阈值[CNT不满足]的结果）, 开启人声噪音识别率会增加，但集外误识别会提升
 #endif 
 
-#ifndef RECOVER_RESULT_MODE
-#define RECOVER_RESULT_MODE      (0) // RECOVER_RESULT_ENABLE 为1 有效，语音识别结果回收使能作用模式，0 命令词和唤醒词; 1 唤醒词
+#ifndef RECALL_RESULT_MODE
+#define RECALL_RESULT_MODE      (0) // RECALL_RESULT_ENABLE 为1 有效，语音识别结果回收使能作用模式，0 命令词和唤醒词; 1 唤醒词
 #endif 
 
-#ifndef RECOVER_RESULT_MAX_FRM
-#define RECOVER_RESULT_MAX_FRM   (0) // RECOVER_RESULT_ENABLE 为1 有效，回收使能 在CNT基础上再增加超时帧数 , 10=300 ms ,理论范围 [0-200],建议范围[0-20]
+#ifndef RECALL_RESULT_MAX_FRM
+#define RECALL_RESULT_MAX_FRM   (0) // RECALL_RESULT_ENABLE 为1 有效，回收使能 在CNT基础上再增加超时帧数 , 10=300 ms ,理论范围 [0-200],建议范围[0-20]
 #endif 
 
 
@@ -283,6 +282,9 @@
 #define USE_DEREVERB_MODULE            0
 #endif
 
+#if USE_DEREVERB_MODULE
+#define DEREVERB_FREQ_RANGE_INDEX       0  //默认0:算法起效频率160HZ-4800HZ 消耗28KB内存  1: 算法起效频率0-8000HZ 消耗49KB内存     
+#endif
 /*双MIC BEAMFORMING*/
 #ifndef USE_BEAMFORMING_MODULE
 #define USE_BEAMFORMING_MODULE         0
@@ -308,10 +310,6 @@
 #define AUDIO_CAPTURE_USE_SINGLE_CHANNEL   1
 #endif
 
-/*深度分离使能*/
-#ifndef DEEP_SEPARATE_ENABLE
-#define DEEP_SEPARATE_ENABLE              0
-#endif
 
 #ifndef ASR_FE_REDUCE_MEM             
 #define ASR_FE_REDUCE_MEM                1             //默认关闭  0:原方案 1:省内存方案(15K 左右)
@@ -321,12 +319,18 @@
 #define USE_DUAL_MIC_ANY                 0               //使用任意MIC都可以识别
 #endif
 
-
-/*是否使用重采样（若开启AEC并且使用外部codec，IIS0输入ref信号采样率32khz，那么其输出也是32khz）*/
+#ifndef BF_DEEPSE_MODE
+#define BF_DEEPSE_MODE                  1   //1:全深度分离更耗内存(单双网络都可以用) 0：半深度分离(唤醒词做深度分离，命令词不做，只能用双网络)
+#endif
+/*是否使用重采样（若开启AEC并且使用外部codec，IIS0输入ref信号采样率32khz，由于IIS0硬件限制其输出也必须是32khz）*/
 #ifndef INNER_CODEC_AUDIO_IN_USE_RESAMPLE
 #define INNER_CODEC_AUDIO_IN_USE_RESAMPLE   1   //默认打开   0:不开重采样   1：打开重采样
 #endif
 
+#if AUTO_GET_AEC_GAIN
+#define PLAY_WELCOME_EN                 0      //AEC自动增益工具启动时不播放开机提示音（不可修改）
+#define AEC_TOP_CLIP_DETECT_ENABLE      0      //AEC自动增益工具启动时关闭AEC削顶检查（不可修改）
+#endif
 
 /*内部CODEC ALC的最大增益*/
 #ifndef INNER_CODEC_ALC_MAX_GAIN    
@@ -539,7 +543,6 @@
 #define MSG_COM_USE_UART_EN                0
 #endif
 
-
 #ifndef UART_PROTOCOL_NUMBER
 #define UART_PROTOCOL_NUMBER	          (HAL_UART1_BASE)// HAL_UART0_BASE ~ HAL_UART2_BASE
 #endif
@@ -580,42 +583,6 @@
 #define BAUDRATE_FAST_SYNC_PERIOD   5000         // 一次波特率校准识别后，下一次同步周期，单位毫秒
 #endif
 
-// #ifndef UART_CALIBRATE_FIX_BAUDRATE
-// #define UART_CALIBRATE_FIX_BAUDRATE         9600            //通信波特率
-// #endif
-
-// #ifndef UART_CALIBRATE_MAX_ERR_PROPORITION
-// #define UART_CALIBRATE_MAX_ERR_PROPORITION  0.08            //允许的最大误差比8%
-// #endif
-
-// #ifndef UART_CALIBRATE_ARRAY_SIZE
-// #define UART_CALIBRATE_ARRAY_SIZE           16              //最大数据缓存
-// #endif
-
-// #ifndef UART_CALIBRATE_IO_BASE
-// #define UART_CALIBRATE_IO_BASE              PA              //校准波特率的IO口(RX引脚)
-// #endif
-
-// #ifndef UART_CALIBRATE_IO_PIN
-// #define UART_CALIBRATE_IO_PIN               pin_2
-// #endif
-
-// #ifndef UART_CALIBRATE_IO_PAD
-// #define UART_CALIBRATE_IO_PAD               PA2
-// #endif
-
-// #ifndef UART_CALIBRATE_IRQ
-// #define UART_CALIBRATE_IRQ                  PA_IRQn
-// #endif
-
-// #ifndef UART_CALIBRATE_TIMER
-// #define UART_CALIBRATE_TIMER                TIMER2
-// #endif
-
-// #ifndef UART_CALIBRATE_TIMER_BASE
-// #define UART_CALIBRATE_TIMER_BASE           HAL_TIMER2_BASE
-// #endif
-
  #endif
 
 //系统参数同步
@@ -643,7 +610,12 @@
 #define I2C_PROTOCOL_SPEED            (100)              /*IIC传输速度*/
 #endif
 
-
+#ifndef AUDIO_PLAYER_ENABLE
+#define AUDIO_PLAYER_ENABLE                 0 //是否启用音频播放器   =1是 =0否
+#endif
+#ifndef SAP_SOURCE_DATA_BUF_SIZE
+#define SAP_SOURCE_DATA_BUF_SIZE            160 //MP3解码buf大小   
+#endif 
 // 播报音配置
 #ifndef PLAY_WELCOME_EN
 #define PLAY_WELCOME_EN                     1 //欢迎词播报          =1是 =0否
@@ -658,8 +630,8 @@
 #define PLAY_OTHER_CMD_EN                   1 //命令词播报          =1是 =0否
 #endif
 /******************************ASR config************************************/
-#ifndef ADAPTIVE_THRESHOLD
-#define ADAPTIVE_THRESHOLD                  0   //ASR 自适应阈值    =1 开启  =0 关闭
+#ifndef NOISE_ADAPTIVE_CONFIDENCE_EN
+#define NOISE_ADAPTIVE_CONFIDENCE_EN        0   //开启能提升稳态噪声下识别      =1 开启  =0 关闭
 #endif
 
 #ifndef ASR_SKIP_FRAME_CONFIG
@@ -681,7 +653,7 @@
 #define VAD_SENSITIVITY         VAD_SENSITIVITY_HIGH    //用于配置VAD灵敏度
 #endif
 
-#define DNN_NUM_CHECK_MAX          5         //dnn最大模型检测个数
+#define DNN_NUM_CHECK_MAX          5                     //dnn最大模型检测个数
 
 
 //语音相关的宏
@@ -698,8 +670,9 @@
     #endif
 #endif
 
-#define POST_MIN_CNT               2    //默认设置为2,设置为1会提升4个点的识别率，但误识会增加；设置到3，误识最低，用户根据需求调整
-
+#ifndef RECALL_MIN_CNT
+#define RECALL_MIN_CNT               2    //默认设置为2,设置为1会提升4个点的识别率，但误识会增加；设置到3，误识最低，用户根据需求调整
+#endif
 //使用IIS输出算法处理之后的语音
 #ifndef USE_IIS1_OUT_PRE_RSLT_AUDIO
 #define USE_IIS1_OUT_PRE_RSLT_AUDIO  (0)
@@ -725,11 +698,6 @@
 // #ifndef USE_OUTSIDE_CODEC_PLAY
 // #define USE_OUTSIDE_CODEC_PLAY      0//使用外部codec进行播放
 // #endif
-#define REF_IN_FROM_INNER_CODEC     0
-
-#ifndef HOST_MIC_USE_NUMBER              
-#define HOST_MIC_USE_NUMBER     1      //使用mic数量
-#endif
 
 #ifndef HOST_MIC_RECORD_CODEC_ID   
 #if  REF_IN_FROM_INNER_CODEC
@@ -755,10 +723,8 @@
 #define REF_RECORD_CODEC_ID     0   //参考信号录音codec id: 0：参考信号接外部CODEC  1：参考信号接内部CODEC 2：参考信号使用PDM，
 #endif                              //只在参考和MIC使用不一样的CODEC时使用
 
-#if  REF_IN_FROM_INNER_CODEC
 #ifndef REF_RECORD_INNER_CODEC_ID              
 #define REF_RECORD_INNER_CODEC_ID        1   //iis_sample中  0：主MIC接外部CODEC  1：主MIC使用PDM 2：aec_ref
-#endif
 #endif
 
 #ifndef REF_RECORD_CODEC_CHA_NUM              
@@ -841,8 +807,163 @@
 #define MIC_DIFF_SINGLE                     0              //1，单端。0，差分（通用模块都是差分模式，省成本的模块为单端（MICN_L 接GND）时，需要配置为SINGLE）
 #endif
 
+#ifndef REF_DIFF_SINGLE
+#define REF_DIFF_SINGLE                     0              //1-单端  0-差分（D类功放是采用单mic aec 使用 差分 mic ; AB类功放是采用单mic aec 使用 单端 mic)
+#endif
+
+#ifndef CODEC_ADC_MIC_AMP_L
+#define CODEC_ADC_MIC_AMP_L                 INNER_CODEC_MIC_AMP_12dB
+#endif
+
+#ifndef CODEC_ADC_MIC_AMP_R
+#define CODEC_ADC_MIC_AMP_R                 INNER_CODEC_MIC_AMP_12dB
+#endif
+
+#ifndef PGA_GAIN_L
+#define PGA_GAIN_L                          28.5f
+#endif
+
+#ifndef PGA_GAIN_R
+#define PGA_GAIN_R                          28.5f
+#endif
+
+#ifndef AEC_PGA_GAIN_L
+#define AEC_PGA_GAIN_L                      20.0f
+#endif
+
+#ifndef AEC_PGA_GAIN_R
+#define AEC_PGA_GAIN_R                      4.0f
+#endif
+
+#ifndef OUTSIDE_CODEC_GAIN
+#define OUTSIDE_CODEC_GAIN                  14.0f
+#endif
+
+#ifndef DIG_GAIN_L
+#define DIG_GAIN_L                          1.0f
+#endif
+
+#ifndef DIG_GAIN_R
+#define DIG_GAIN_R                          1.0f
+#endif
+
+#ifndef IIS0_MODE
+#define IIS0_MODE                           IIS_MASTER
+#endif
+
+#ifndef IIS0_OVER_SAMPLE
+#define IIS0_OVER_SAMPLE                    IIS_MCLK_FS_256
+#endif
+
+#ifndef IIS0_CLK_SOURCE
+#define IIS0_CLK_SOURCE                     AUDIO_PLAY_CLK_SOURCE_IPCORE
+#endif
+
+#ifndef IIS0_MCLK_EN
+#define IIS0_MCLK_EN                        IIS_MCLK_OUT
+#endif
+
+#ifndef IIS0_DATA_FORMAT
+#define IIS0_DATA_FORMAT                    IIS_DF_IIS
+#endif
+
+#ifndef IIS0_SCK_LRCK_RATIO
+#define IIS0_SCK_LRCK_RATIO                 IIS_SCK_LRCK_64
+#endif
+
+#ifndef IIS0_TX_CHA
+#define IIS0_TX_CHA                         IIS_TX_CHANNAL_TX0
+#endif
+
+#ifndef IIS0_RX_CHA
+#define IIS0_RX_CHA                         IIS_RX_CHANNAL_RX0
+#endif
+
+#ifndef IIS0_OUTSIDE_MCLK_FRE
+#define IIS0_OUTSIDE_MCLK_FRE               0
+#endif
+
+#ifndef IIS0_SCK_LRCK_OUT_EN
+#define IIS0_SCK_LRCK_OUT_EN                IIS_SCKLRCK_OUT
+#endif
+
+#ifndef IIS0_SAMPLE_RATE
+#define IIS0_SAMPLE_RATE                    16000
+#endif
+
+#ifndef IIS0_TX_CHANNEL_FLAG
+#define IIS0_TX_CHANNEL_FLAG                3
+#endif
+
+#ifndef IIS0_RX_CHANNEL_FLAG
+#define IIS0_RX_CHANNEL_FLAG                3
+#endif
+
+#ifndef IIS0_SAMPLE_DEPTH
+#define IIS0_SAMPLE_DEPTH                   IIS_DW_16BIT
+#endif
+
+#ifndef IIS0_BUF_NUM_RATIO
+#define IIS0_BUF_NUM_RATIO                  1
+#endif
+
+//IIS0 当前采样率BUF长度与16khz采样率的数据长度比值,当采样率不为16K时\
+目前自动调用ci_alg_common_api.c中的升降采样接口，目前只支持整数倍升降采样
+#if (IIS0_SAMPLE_RATE > 16000)
+#define IIS0_BUF_NUM_RATIO                  IIS0_SAMPLE_RATE/16000
+#define UP_DOWN_FLAG                        1                             //0-不升降采样 1-升采样 2-降采样
+#elif(IIS0_SAMPLE_RATE < 16000)
+#define IIS0_BUF_NUM_RATIO                  16000/IIS0_SAMPLE_RATE
+#define UP_DOWN_FLAG                        2                             //0-不升降采样 1-升采样 2-降采样
+#else
+#define IIS0_BUF_NUM_RATIO                  1
+#define UP_DOWN_FLAG                        0                             //0-不升降采样 1-升采样 2-降采样
+#endif
+
+#if (UP_DOWN_FLAG != 0) && (USE_IIS1_OUT_PRE_RSLT_AUDIO || AUDIO_DATA_UPLOAD_BY_IIS)
+#define UP_DOWN_ENABLE      1 
+#endif
+
+#ifndef AEC_TOP_CLIP_REDUCE_GAIN
+#define AEC_TOP_CLIP_REDUCE_GAIN                     0
+#endif
+
+#ifndef AEC_TOP_CLIP_DETECT_ENABLE
+#define AEC_TOP_CLIP_DETECT_ENABLE                     0
+#endif
+
+#ifndef NET_AUDIO_PCM_G722_SAMPLE_RATE
+#define NET_AUDIO_PCM_G722_SAMPLE_RATE                     16000
+#endif
+
+#ifndef NET_AUDIO_PCM_G722_CHANNEL_FLAG
+#define NET_AUDIO_PCM_G722_CHANNEL_FLAG                     1
+#endif
+
+#ifndef NET_AUDIO_PCM_G722_SAMPLE_DEPTH
+#define NET_AUDIO_PCM_G722_SAMPLE_DEPTH                     16
+#endif
+
+#ifndef NET_AUDIO_PCM_FRAME_SIZE
+#define NET_AUDIO_PCM_FRAME_SIZE                     (512)
+#endif
+
+#ifndef NET_AUDIO_G722_FRAME_SIZE
+#define NET_AUDIO_G722_FRAME_SIZE                    (320)
+#endif
+
+
 #define OTA_STA_UPDATE              0xFC                  //不可修改
 #define OTA_STA_FINISH              0xF0                  //不可修改
+
+#define UPLOAD_PCM_DATA_ENABLE                            0             //上传音频裸数据不带协议-调试使用 1-使能 0-关闭(默认)
+#if UPLOAD_PCM_DATA_ENABLE
+#define UPLOAD_PCM_VAD_TAG_ENABLE                         1            //上传pcm数据时带vad 标签
+#define NETWORK_SEND_BUFF_MAX_SIZE                      640
+#define AUDIO_COMPRESS_SPEEX_ENABLE                       0 
+#define AUDIO_SEND_WITH_PROTOCOL_HEADER                   0                    //1-带协议头上传 0-不带协议直接传裸数据
+#endif 
+#define AUDIO_PLAY_MODE                                   1             //1-支持打断当前播放 0-不支持，顺序播放-暂时不用
 
 #if (USE_LOWPOWER_DOWN_FREQUENCY)
 #undef INNER_CODEC_AUDIO_IN_USE_RESAMPLE

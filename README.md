@@ -11,14 +11,19 @@ CI130X SDK 适用于CI130X系列芯片
 | .vscode    | 编译器配置文件   |
 | components | 组件             |
 | driver     | 驱动             |
+| external   | 扩展文件（NN模型、OTA固件）|
 | libs       | 库文件           |
 | projects   | 示例工程         |
 | startup    | 启动文件         |
 | system     | 系统文件         |
 | tool       | 固件构建升级工具 |
 | utils      | 调试帮助工具     |
+| 对接协议   | 离在线应用对接说明|
+
 
 ## 资料查找
 编译环境安装说明、芯片手册、开发板资料等，详见启英泰伦语音AI平台网址：https://aiplatform.chipintelli.com
+
+OTA相关资料：主端参考代码、制作ota固件的工具、ota_code源码等，详见启英泰伦开发支持网址：https://www.chipintelli.com/zh-cn/page/153.html
 
 *版权归chipintelli公司所有，未经允许不得使用或修改*

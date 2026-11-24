@@ -19,7 +19,7 @@
 #include "status_share.h"
 #include "romlib_runtime.h"
 
-
+extern bool g_bnpu_init_flag;
 #define FMC_CI_ASSERT(x,msg)                                                                                                    \
     if( ( x ) == 0 )                                                                                                        \
     {                                                                                                                       \
@@ -219,7 +219,7 @@ void flash_manage_read(uint32_t dst_addr,uint32_t src_addr,uint32_t size)
 void flash_init_to_xip(void)
 {
     scu_run_in_flash();
-    flash_init(QSPI0,DISABLE);
+    flash_init(QSPI0,ENABLE);
     spic_xipconfig(QSPI0);
     // vTaskDelay(pdMS_TO_TICKS(10));
 }
@@ -311,6 +311,10 @@ static void flash_idle_deal_with(flash_ctr_msg_t* msg_p)
             // mprintf("write:");
             // timer0_start_debug_time(true);
             flash_manage_take_sem();
+            if(g_bnpu_init_flag)
+            {
+                take_bnpu_nn_run_sem();   //增加 nn操作和 flash操作同步
+            }
             flash_state = FLASH_STATE_WRITE_BUSY;
             ciss_set(CI_SS_FLASH_BNPU_STATE,CI_SS_FLASH_WRITE);
             //写操作流程
@@ -323,6 +327,10 @@ static void flash_idle_deal_with(flash_ctr_msg_t* msg_p)
             flash_config_to_xip();
             flash_state = FLASH_STATE_IDLE;
             flash_manage_give_sem();
+            if(g_bnpu_init_flag)
+            {
+                give_bnpu_nn_run_sem();
+            }
             if(FLASH_WRITE_OPERTATE == op_type)
             {
                 flash_manage_give_op_done_sem(FLASH_WRITE_OPERTATE);
@@ -342,6 +350,10 @@ static void flash_idle_deal_with(flash_ctr_msg_t* msg_p)
             // mprintf("write:");
             // timer0_start_debug_time(true);
             flash_manage_take_sem();
+            if(g_bnpu_init_flag)
+            {
+                take_bnpu_nn_run_sem();   //增加 nn操作和 flash操作同步
+            }
             flash_state = FLASH_STATE_READ_UNIQUE_ID_BUSY;
             ciss_set(CI_SS_FLASH_BNPU_STATE,CI_SS_FLASH_READ_UNIQUE_ID);
             //写操作流程
@@ -354,6 +366,10 @@ static void flash_idle_deal_with(flash_ctr_msg_t* msg_p)
             flash_config_to_xip();
             flash_state = FLASH_STATE_IDLE;
             flash_manage_give_sem();
+            if(g_bnpu_init_flag)
+            {
+                give_bnpu_nn_run_sem();
+            }
             if(FLASH_READ_UNIQUE_ID_OPERTATE == op_type)
             {
                 flash_manage_give_op_done_sem(FLASH_READ_UNIQUE_ID_OPERTATE);
@@ -373,6 +389,10 @@ static void flash_idle_deal_with(flash_ctr_msg_t* msg_p)
             // mprintf("erase:");
             // timer0_start_debug_time(true);
             flash_manage_take_sem();
+            if(g_bnpu_init_flag)    //增加nn 操作和 flash 操作同步; nn操作是在xip模式下读数据，这里切模式到normal模式不同步会出问题
+            {
+                take_bnpu_nn_run_sem();   
+            }
             flash_state = FLASH_STATE_ERASE_BUSY;
             ciss_set(CI_SS_FLASH_BNPU_STATE,CI_SS_FLASH_ERASE);
             //擦除操作流程
@@ -385,6 +405,10 @@ static void flash_idle_deal_with(flash_ctr_msg_t* msg_p)
             flash_config_to_xip();
             flash_state = FLASH_STATE_IDLE;
             flash_manage_give_sem();
+            if(g_bnpu_init_flag)
+            {
+                give_bnpu_nn_run_sem();
+            }
             if(FLASH_ERASE_OPERTATE == op_type)
             {
                 flash_manage_give_op_done_sem(FLASH_ERASE_OPERTATE);

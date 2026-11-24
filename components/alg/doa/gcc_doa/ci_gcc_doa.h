@@ -49,13 +49,25 @@
  * @{
  */
 
+#define DISTANCE_30            30
+#define DISTANCE_40            40
+#define DISTANCE_50            50
+#define DISTANCE_60            60
+#define DISTANCE_70            70
+#define DISTANCE_80            80
+
+#define DISTANCE_30_BASE_SCALE 1.25f
+#define DISTANCE_40_BASE_SCALE 1.0f
+#define DISTANCE_50_BASE_SCALE 1.3f
+#define DISTANCE_60_BASE_SCALE 1.2f
+#define DISTANCE_70_BASE_SCALE 1.15f
+#define DISTANCE_80_BASE_SCALE 1.0f
+
 typedef struct
 {
     bool alg_enable;
     //初始化参数
     int distance;
-    int min_frebin;
-    int max_frebin;
     int samplerate;
     float corr_alpha;
     int num_frebin;

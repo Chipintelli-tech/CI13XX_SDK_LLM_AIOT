@@ -11,7 +11,7 @@
 #define _CI_SYSTEM_INFO_H_
 
 #include "ci_debug_config.h"
-
+#include "sdk_default_config.h"
 #ifdef __cplusplus
 extern "C"
 {
@@ -26,6 +26,7 @@ extern "C"
 #define PRINT_FMEM_STATUS()    do{}while(0)
 #define PRINT_TASK_STATUS()    do{}while(0)
 #endif
+
 /**
  * @ingroup assist
  * @defgroup system_info 系统状态查询

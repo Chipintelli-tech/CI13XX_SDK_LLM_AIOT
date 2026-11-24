@@ -54,6 +54,7 @@ extern "C"
 
   //aec门限接口
   bool get_aec_alc_state(void);
+  bool get_aec_ampl_mute_flag(void);
   void* set_aec_gain(void* wrapfft_audio_t);
   bool ci_aec_application_enable(void *wrapfft_audio_t);
 #ifdef __cplusplus

@@ -9,14 +9,11 @@
 
 #define CONFIG_SYSTEMVIEW_EN               0                   //不使能systemview
 
-#if SDK_RELEASE_EN
-#define CONFIG_CI_LOG_UART                  0//HAL_UART0_BASE    
-#else
-#define CONFIG_CI_LOG_UART                  HAL_UART0_BASE  
-#endif
+#define CONFIG_CI_LOG_UART                  0//HAL_UART0_BASE
+
 #define USE_PWK                             1
 
-#if (USE_BEAMFORMING_MODULE  || USE_NN_DOA || USE_GCC_DOA || USE_DEREVERB_MODULE || USE_DUAL_MIC_ANY) && !REF_IN_FROM_INNER_CODEC
+#if (USE_BEAMFORMING_MODULE  || USE_NN_DOA || USE_GCC_DOA || USE_DEREVERB_MODULE || USE_DUAL_MIC_ANY)
 #define HOST_CODEC_CHA_NUM              2
 #define OFFLINE_DUAL_MIC_ALG_SUPPORT    1     //双MIC功能使能:1-开启/0-关闭
 #define DOA_DEBUG_MODE                  0     //doa算法是否通过协议串口，输出micl的采音信息

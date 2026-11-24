@@ -26,6 +26,10 @@
 #include "opus_private.h"
 #include "opus_defines.h"
 #endif
+#if USE_NN_VAD
+#include "temporal_vad_api.h"
+extern tvad_config_t nn_vad_config;
+#endif
 static void play_done_callback(cmd_handle_t cmd_handle)
 {
 }
@@ -55,69 +59,6 @@ void get_vad_end_mute_frame(int param_index)
         break;
     }
 }
-void opus_data_decode_task(void *parameter)
-{
-#if NET_AUDIO_PLAY_BY_OPUS
-    uint8_t ret = 0;
-    uint8_t opus_rcv_data[OPUS_PLAY_QUEUE_TIEM_SIZE] = {0};
-    int16_t opus_dec_data[OPUS_DECODE_DATA_SIZE * sizeof(int16_t)] = {0};
-    OpusDecoder *opusDecoder = NULL;
-    int size = opus_decoder_get_size(1);
-    mprintf("==opus_decoder malloc size = %d\r\n", size);
-    opusDecoder = pvPortMalloc(size);
-    ret = opus_decoder_init(opusDecoder, 16000, 1); // 最低延迟
-    if (ret != OPUS_OK)
-    {
-        mprintf("== opus decoder init error!\r\n");
-        return;
-    }
-    opus_decoder_ctl(opusDecoder, OPUS_SET_BITRATE(16000));
-    opus_decoder_ctl(opusDecoder, OPUS_SET_EXPERT_FRAME_DURATION(OPUS_FRAMESIZE_40_MS));
-    opus_decoder_ctl(opusDecoder, OPUS_APPLICATION_RESTRICTED_LOWDELAY);
-    opus_decoder_ctl(opusDecoder, OPUS_SET_VBR(0));            // 强制CBR
-    opus_decoder_ctl(opusDecoder, OPUS_SET_VBR_CONSTRAINT(1)); // 约束VBR
-    opus_decoder_ctl(opusDecoder, OPUS_SET_BANDWIDTH(OPUS_BANDWIDTH_WIDEBAND));
-    opus_decoder_ctl(opusDecoder, OPUS_SET_COMPLEXITY(10));
-    opus_decoder_ctl(opusDecoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
-    // 16bit
-    opus_decoder_ctl(opusDecoder, OPUS_SET_LSB_DEPTH(16));
-    opus_decoder_ctl(opusDecoder, OPUS_SET_PACKET_LOSS_PERC(0));
-    opus_decoder_ctl(opusDecoder, OPUS_SET_DTX(0));
-    int skip = 0;
-    opus_decoder_ctl(opusDecoder, OPUS_GET_LOOKAHEAD(&skip));
-    opus_decoder_ctl(opusDecoder, OPUS_SET_FORCE_CHANNELS(OPUS_AUTO));
-    mprintf("opus_decoder_init ok\r\n");
-    while (1)
-    {
-        ret = xQueueReceive(gCiasAiotRunParam.opus_play_queue, opus_rcv_data, portMAX_DELAY);
-        if (pdPASS == ret)
-        {
-            // 解码
-            //mprintf("===decoded start\r\n");
-            // for(int i = 0; i < 20; i++)
-            // {
-            //     mprintf("%02x ", opus_rcv_data[i]);
-            // }
-            int decoded_size = opus_decode(opusDecoder, opus_rcv_data, OPUS_PLAY_QUEUE_TIEM_SIZE, opus_dec_data, OPUS_DECODE_DATA_SIZE * sizeof(int16_t), 0);
-           // mprintf("decoded_size = %d\r\n", decoded_size);
-            if (decoded_size < 0)
-            {
-                mprintf("Opus decode error: %d", opus_strerror(decoded_size));
-            }
-            else
-            {
-                // 发送到播放数据队列
-                // int send_pcm_play_size = xStreamBufferSend(gCiasAiotRunParam.pcm_play_data_stream_buffer, (uint32_t)opus_dec_data, OPUS_DECODE_DATA_SIZE * sizeof(int16_t), 300);
-                // if (send_pcm_play_size != OPUS_DECODE_DATA_SIZE * sizeof(int16_t))
-                // {
-                //     mprintf("opus send pcm_play_data_stream_buffer error\r\n");
-                // }
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(5));
-    }
-#endif
-}
 void pcm_data_play_task(void *parameter)
 {
    
@@ -140,46 +81,6 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
     ans_cmd_buf[1] = (wifi_cmd >> 8) & 0xff;
     switch (wifi_cmd)
     {
-    case SET_VAD_SENSITIVITY: // 设置vad灵敏度(45-60)
-        if (pheader->len == 1)
-        {
-            uint8_t sensitivity_val = msg_buf[msg_offset];
-            if (sensitivity_val >= 45 && sensitivity_val <= 60)
-            {
-                extern vox_config_t vox_config;
-                vox_config.agc_split_boundary = sensitivity_val;
-                if ((vox_config.agc_split_boundary >= 45) && (vox_config.agc_split_boundary <= 48))     // 高灵敏度
-                {
-                    mprintf("set high sensitivity...\r\n");
-                    vox_config.agc_gate_h = -3000.0f;
-                    vox_config.agc_gate_l = -4500.0f;
-                    vox_config.agc_gate_end = -2000.0f;
-                }
-                else if ((vox_config.agc_split_boundary >= 49) && (vox_config.agc_split_boundary <= 52)) // 中等灵敏度
-                {
-                    mprintf("set middle sensitivity...\r\n");
-                    vox_config.agc_gate_h = -4000.0f;
-                    vox_config.agc_gate_l = -6500.0f;
-                    vox_config.agc_gate_end = -3000.0f;
-                }
-                else if ((vox_config.agc_split_boundary >= 53) && (vox_config.agc_split_boundary <= 60)) // 低灵敏度
-                {
-                    mprintf("set low sensitivity...\r\n");
-                    vox_config.agc_gate_h = -5500.0f;
-                    vox_config.agc_gate_l = -8000.0f;
-                    vox_config.agc_gate_end = -4500.0f;
-                }
-            }
-            else
-            {
-                goto PARSE_WIFI_MSG_ERR;
-            }
-        }
-        else
-        {
-           goto PARSE_WIFI_MSG_ERR;
-        }
-        break;
     case SET_AUDIO_EXIT_WAKE_UP:
         if (pheader->len == 1)
         {
@@ -241,20 +142,54 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
             goto PARSE_WIFI_MSG_ERR;
         }
         break;
-    case SET_VAD_FILTER_FRAME:
+    #if USE_NN_VAD
+    case SET_VAD_SENSITIVITY: // 设置vad灵敏度(0/1/2，对应低，中，高)
         if (pheader->len == 1)
         {
-            uint16_t param = msg_buf[msg_offset];
-            param |= (msg_buf[msg_offset + 1] << 8);
-            if (param < 15 || param > 40)
+            uint8_t sensitivity_val = msg_buf[msg_offset];
+            if (sensitivity_val == 2)
             {
-                mprintf("SET_VAD_FILTER_FRAME set = %d, error(15-40)\r\n", param);
+                mprintf("set high sensitivity...\r\n");
+            }
+            else if(sensitivity_val == 1)
+            {
+                mprintf("set middle sensitivity...\r\n");
+            }
+            else if(sensitivity_val == 0)
+            {
+                mprintf("set low sensitivity...\r\n");
             }
             else
             {
-                mprintf("SET_VAD_FILTER_FRAME set = %d ok\r\n", param);
-                gCiasAiotFuncParam.vad_filter_frame = param;
+                mprintf("err value to set sensitivity...\r\n");
+                goto PARSE_WIFI_MSG_ERR;
             }
+            nn_vad_config.tvad_start_sen = sensitivity_val;
+            ciss_set(CI_SS_NN_VAD_PARAM_SET,CI_SS_NN_VAD_PARAM_SEN_LEVEL);
+        }
+        else
+        {
+           goto PARSE_WIFI_MSG_ERR;
+        }
+        break;
+    case SET_VAD_FILTER_FRAME:
+        if (pheader->len == 1)
+        {
+            uint8_t param = msg_buf[msg_offset];
+            if (param < 18)
+            {
+                mprintf("SET_VAD_FILTER_FRAME set = %d, error(18-35),force set 18\r\n", param);
+            }
+            else if(param > 35)
+            {
+                mprintf("SET_VAD_FILTER_FRAME set = %d, error(18-35),force set 35\r\n", param);
+            }
+            else
+            {
+                mprintf("SET_VAD_FILTER_FRAME set = %d\r\n", param);
+            }
+            nn_vad_config.tvad_valid_num = param;
+            ciss_set(CI_SS_NN_VAD_PARAM_SET,CI_SS_NN_VAD_PARAM_VALID_FRAME);
         }
         else
         {
@@ -265,17 +200,20 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         if (pheader->len == 1)
         {
             uint8_t param = msg_buf[msg_offset];
-            if (param == 6 || param == 15 || param == 20 || param == 50 || param == 80 || param == 120)
+            if (param < 20)
             {
-                gCiasAiotFuncParam.vad_end_mute_param_index = param;
-                get_vad_end_mute_frame(gCiasAiotFuncParam.vad_end_mute_param_index);
-                mprintf("SET_VAD_SENSITIVITY_ACTIVATE_LENTH set ok, set val = %d\r\n", param);
-                ciss_set(CI_SS_VOX_SET_END_CONFIDENCE, gCiasAiotFuncParam.vad_end_mute_param_index);
+                mprintf("SET_VAD_SENSITIVITY_ACTIVATE_LENTH set = %d, error(20-40),force set 20\r\n", param);
+            }
+            else if(param > 40)
+            {
+                mprintf("SET_VAD_SENSITIVITY_ACTIVATE_LENTH set = %d, error(20-40),force set 40\r\n", param);
             }
             else
             {
-                mprintf("SET_VAD_SENSITIVITY_ACTIVATE_LENTH set error, set val = %d\r\n", param);
+                mprintf("SET_VAD_SENSITIVITY_ACTIVATE_LENTH set = %d\r\n", param);
             }
+            nn_vad_config.tvad_end_delay = param;
+            ciss_set(CI_SS_NN_VAD_PARAM_SET,CI_SS_NN_VAD_PARAM_END_DELAY);
         }
         else
         {
@@ -287,17 +225,76 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
         {
             uint16_t param = msg_buf[msg_offset];
             param |= (msg_buf[msg_offset + 1] << 8);
-            mprintf("SET_VAD_START_MAX_TIMEOUT set = %d\r\n", param);
-            gCiasAiotFuncParam.vad_start_max_timeout = param;
-            extern vox_config_t vox_config;
-            vox_config.vad_on_max_timeout = param;
+            if (param < 1)
+            {
+                mprintf("SET_VAD_START_MAX_TIMEOUT set = %d, error(1-15),force set 1\r\n", param);
+                gCiasAiotFuncParam.vad_start_max_timeout = 1;
+            }
+            else if(param > 15)
+            {
+                mprintf("SET_VAD_START_MAX_TIMEOUT set = %d, error(1-15),force set 15\r\n", param);
+                gCiasAiotFuncParam.vad_start_max_timeout = 15;
+            }
+            else
+            {
+                mprintf("SET_VAD_START_MAX_TIMEOUT set = %d\r\n", param);
+                gCiasAiotFuncParam.vad_start_max_timeout = param;
+            }
+            nn_vad_config.tvad_on_timeout = param*100;
+            ciss_set(CI_SS_NN_VAD_PARAM_SET,CI_SS_NN_VAD_PARAM_OUT_END);
         }
         else
         {
             goto PARSE_WIFI_MSG_ERR;
         }
         break;
-    case SET_PLAY_VOICE_ID:
+    case SET_VAD_MAX_TIMEOUT_ENABLE:
+        if (pheader->len == 1)
+        {
+            uint8_t param = msg_buf[msg_offset];
+            if (param != 1 && param != 0)
+            {
+                mprintf("SET_VAD_MAX_TIMEOUT_ENABLE set = %d, error(1 or 0)\r\n", param);
+                goto PARSE_WIFI_MSG_ERR;
+            }
+            else
+            {
+                mprintf("SET_VAD_START_MAX_TIMEOUT set = %d\r\n", param);
+                nn_vad_config.tvad_timeout_enable = (bool)param;
+                ciss_set(CI_SS_NN_VAD_PARAM_SET,CI_SS_NN_VAD_PARAM_OUT_END_EN);
+            }
+        }
+        else
+        {
+            goto PARSE_WIFI_MSG_ERR;
+        }
+        break;
+    case SET_VAD_MIN_SPEECH_DB:
+        if (pheader->len == 1)
+        {
+            uint8_t param = msg_buf[msg_offset];
+            if (param > 50)
+            {
+                mprintf("SET_VAD_MIN_SPEECH_DB set = %d, error(35-50),force set 50\r\n", param);
+            }
+            else if(param < 35)
+            {
+                 mprintf("SET_VAD_MIN_SPEECH_DB set = %d, error(35-50),force set 35\r\n", param);
+            }
+            else
+            {
+                mprintf("SET_VAD_MIN_SPEECH_DB set = %d\r\n", param);
+            }
+            nn_vad_config.tvad_min_speech_db = param;
+            ciss_set(CI_SS_NN_VAD_PARAM_SET,CI_SS_NN_VAD_PARAM_MIN_SPEECH);
+        }
+        else
+        {
+            goto PARSE_WIFI_MSG_ERR;
+        }
+        break;
+    #endif
+        case SET_PLAY_VOICE_ID:
         if (pheader->len == 3)
         {
             uint16_t param = msg_buf[msg_offset];
@@ -618,7 +615,11 @@ int32_t aiot_wifi_msg_callback(const uint8_t *msg_buf)
             }
             else if (param == 0)
             {
-               	ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE);  //更新播放空闲
+                #if USE_AEC_MODULE
+                ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE); // 设置播放结束
+                #else
+                ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE); // 设置播放结束
+                #endif
             }
             else
             {

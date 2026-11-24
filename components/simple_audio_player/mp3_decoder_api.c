@@ -250,7 +250,7 @@ int32_t get_cur_frame_size( uint8_t *data, int *bytes_left)
     return ret;
 }
 #endif
-#if AUDIO_PLAYER_ENABLE
+#if AUDIO_PLAYER_ENABLE || NET_AUDIO_PLAY_BY_MP3
 register_audio_decoder(MP3, mp3_decoder_init, mp3_docoder_deinit, get_info, decode_one_frame); 
 #endif
 #endif

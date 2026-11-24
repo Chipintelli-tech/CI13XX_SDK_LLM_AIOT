@@ -70,6 +70,7 @@ typedef struct ci_ssp_config_st
   ci_ssp_st stft;            //FFT
   ci_ssp_st doa;             //DOA
   ci_ssp_st aec;             //AEC
+  
   ci_ssp_st dereverb;        //DEREVERB
   ci_ssp_st bf;
   ci_ssp_st nn_denoise;      //NN降噪
@@ -252,6 +253,8 @@ extern "C"
   int ci_nn_denoise_processing(void *handle, void *wrapfft_audio_t);
 
   void ci_nn_vad_module_init(void *module_config, void *wrapfft_audio_t);
+
+  int ci_nn_vad_processing(void *handle, void *wrapfft_audio_t);
 #ifdef __cplusplus
 }
 #endif

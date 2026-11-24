@@ -43,7 +43,10 @@ static ci_speex_t *ci_speex_hander = NULL;
 #include "opus_private.h"
 #include "opus_defines.h"
 #endif
-
+#if USE_NN_VAD
+#include "temporal_vad_api.h"
+extern tvad_config_t nn_vad_config;
+#endif
 CiasAiotRunParamTypedef gCiasAiotRunParam =
     {
         .customer_wakeup_on_callback = NULL,
@@ -56,12 +59,13 @@ CiasAiotRunParamTypedef gCiasAiotRunParam =
         .pcm_play_data_stream_buffer = NULL,
         .local_asr_finish_flag = false,
         .mp3_play_finish_flag = true,
+        .is_vad_ending_flag = false,
 };
 CiasAiotFuncParamTypedef gCiasAiotFuncParam =
 {
         // .vad_filter_frame = VAD_ON_MIN_NUM,
       //  .vad_end_mute_param_index = VOX_VAD_END_CONFIDENCE_DEFAULT,
-        .vad_start_max_timeout = VAD_TIMEOUT_VALUE ,
+        .vad_start_max_timeout = NN_VAD_TIMEOUT_VALUE ,
         .wake_up_continue_timeout = EXIT_WAKEUP_TIME / 1000, // 以S为单位
         .interaction_multi_round = CUR_INTERACTION_MULTI_ROUND_ENABLE,
         .upload_play_full_duplex = UPLOAD_PLAY_FULL_DUPLEX_ENABLE,
@@ -116,7 +120,11 @@ bool cias_aiot_param_refresh(void)
     gCiasAiotRunParam.upload_pcm_to_wifi_flag = false;
     gCiasAiotRunParam.wait_play_end_flag = false;
     // 播放参数初始化
-    gCiasAiotRunParam.stop_collect_pcm_flag = false;
+    if(!gCiasAiotRunParam.is_vad_ending_flag)
+    {
+        //在VAD结束期间不能开启采音
+        gCiasAiotRunParam.stop_collect_pcm_flag = false;
+    }
     ciss_set(CI_SS_VOX_WORK_STATE, 1); // 开启vox vad计算
     ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_IDLE);
 // #if CLOUD_ANS_TIME_OUT_ENEABLE
@@ -157,7 +165,8 @@ void asr_wakeup_on_handle(void)
     }
 #endif
     ciss_set(CI_SS_VOX_VAD_CLEAR, 1); // 唤醒之后必须清除状态，解决唤醒后马上路录音，vad 状态还保持vad on状态，新的vad start无法起来的问题
-#if (NN_VAD_VALID_CHECK_MODE == 2)
+#if USE_NN_VAD
+    if (nn_vad_config.vad_upload_mode == 2)
     ciss_set(CI_SS_VOX_VAD_CHECK,CI_SS_NN_VAD_IDLDE);
 #endif
     #if AUDIO_DATA_UPLOAD_BY_UART
@@ -214,7 +223,7 @@ void cias_aiot_vad_start_handle(int cmd)
     ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_ON);
 #if AUDIO_DATA_UPLOAD_BY_UART
     wakeup_pcm_frame_len = xStreamBufferBytesAvailable(gCiasAiotRunParam.pcm_compress_stream_buffer) / PCM_ALG_FRAME_LEN;
-    rollback_pcm_frame_len = (wakeup_pcm_frame_len >= NN_VAD_BACK_PORCH) ? (wakeup_pcm_frame_len - NN_VAD_BACK_PORCH) : 0;
+    rollback_pcm_frame_len = (wakeup_pcm_frame_len >= NN_VAD_FRONT_PORCH) ? (wakeup_pcm_frame_len - NN_VAD_FRONT_PORCH) : 0;
     mprintf("rollback_pcm_frame_len = %d\r\n", rollback_pcm_frame_len);
     for (int i = 0; i < rollback_pcm_frame_len; i++)
     {
@@ -248,16 +257,19 @@ void cias_aiot_vad_start_handle(int cmd)
 }
 void cias_aiot_vad_end_handle(int type)
 {
-    ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_IDLE);
 #if AUDIO_DATA_UPLOAD_BY_UART
     gCiasAiotRunParam.stop_collect_pcm_flag = true;
+    gCiasAiotRunParam.is_vad_ending_flag = true;
     if (!type) // 强制更新参数，直接返回
     {
-#if (NN_VAD_VALID_CHECK_MODE != 2)
+#if USE_NN_VAD
+        if (nn_vad_config.vad_upload_mode != 2)
+        {
 #if CLOUD_ANS_TIME_OUT_ENEABLE 
-        xTimerStart(gCiasAiotRunParam.cloud_ans_count_timer, 0); // 开始计时
+            xTimerStart(gCiasAiotRunParam.cloud_ans_count_timer, 0); // 开始计时
 #endif
-        gCiasAiotRunParam.cloud_parse_is_busy_flag = true;
+            gCiasAiotRunParam.cloud_parse_is_busy_flag = true;
+        }
 #endif
     }
     else
@@ -316,6 +328,8 @@ void cias_aiot_vad_end_handle(int type)
         mprintf("\r\n==== upload frame count= %d)\r\n", gCiasAiotRunParam.upload_pcm_frame_count);
     }
     cias_aiot_param_refresh();
+    gCiasAiotRunParam.stop_collect_pcm_flag = false;
+    gCiasAiotRunParam.is_vad_ending_flag = false;
 #endif
 #if 0
     sys_msg_t send_msg;
@@ -329,23 +343,26 @@ void cias_aiot_vad_end_handle(int type)
     {
         gCiasAiotRunParam.customer_vad_end_callback();
     }
-#if (NN_VAD_VALID_CHECK_MODE == 2)
-    uint8_t valid_rlt = 0;
-    valid_rlt = ciss_get(CI_SS_VOX_VAD_CHECK);
-    cias_send_cmd_and_data(VAD_VAILD_CHECK_RESULT,&valid_rlt,1, DEF_FILL);
-    ciss_set(CI_SS_VOX_VAD_CHECK,CI_SS_NN_VAD_IDLDE);
-    if (!gCiasAiotFuncParam.interaction_multi_round && CI_SS_NN_VAD_VALID != valid_rlt) // 单轮交互
+#if USE_NN_VAD
+    if (nn_vad_config.vad_upload_mode == 2)
     {
-        gCiasAiotRunParam.is_wake_up_flag = true;
+        uint8_t valid_rlt = 0;
+        valid_rlt = ciss_get(CI_SS_VOX_VAD_CHECK);
+        if(valid_rlt != CI_SS_NN_VAD_IDLDE)
+        cias_send_cmd_and_data(VAD_VAILD_CHECK_RESULT,&valid_rlt,1, DEF_FILL);
+        ciss_set(CI_SS_VOX_VAD_CHECK,CI_SS_NN_VAD_IDLDE);
+        if (!gCiasAiotFuncParam.interaction_multi_round && CI_SS_NN_VAD_VALID != valid_rlt) // 单轮交互
+        {
+            gCiasAiotRunParam.is_wake_up_flag = true;
+        }
+        if (!type && CI_SS_NN_VAD_VALID == valid_rlt) // 强制更新参数，直接返回
+        {
+    #if CLOUD_ANS_TIME_OUT_ENEABLE 
+            xTimerStart(gCiasAiotRunParam.cloud_ans_count_timer, 0); // 开始计时
+    #endif
+            gCiasAiotRunParam.cloud_parse_is_busy_flag = true;
+        }
     }
-    if (!type && CI_SS_NN_VAD_VALID == valid_rlt) // 强制更新参数，直接返回
-    {
-#if CLOUD_ANS_TIME_OUT_ENEABLE 
-        xTimerStart(gCiasAiotRunParam.cloud_ans_count_timer, 0); // 开始计时
-#endif
-        gCiasAiotRunParam.cloud_parse_is_busy_flag = true;
-    }
-
 #endif
 #endif
     
@@ -406,7 +423,7 @@ void vad_state_handle_task(void *p_arg)
         }
         if(!gCiasAiotRunParam.is_vad_force_on_flag)
         {
-            if (ciss_get(CI_SS_VOX_VAD_STATE) == CI_SS_VAD_START) // 检测到vox vad start
+            if (ciss_get(CI_SS_VOX_VAD_STATE) == CI_SS_VAD_START && !gCiasAiotRunParam.is_vad_on_flag) // 检测到vox vad start
             {
     #if CLOUD_ANS_TIME_OUT_ENEABLE
                 if (gCiasAiotRunParam.cloud_parse_is_busy_flag) // 云端处理中
@@ -429,7 +446,6 @@ void vad_state_handle_task(void *p_arg)
                 short vad_end_tag = -32767;
                 voice_data_packet_and_send(PCM_MIDDLE, &vad_end_tag, 2);
     #endif
-                ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_IDLE);
                 if (!asr_reseult_wakup_flag)
                 {
                     mprintf("\r\n---vad end---\r\n");

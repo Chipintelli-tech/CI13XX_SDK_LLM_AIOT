@@ -139,10 +139,6 @@ void vad_state_handle_task(void *p_arg)
         if ((ciss_get(CI_SS_VOX_VAD_STATE) == CI_SS_VAD_END) && gCiasAiotRunParam.is_vad_on_flag) // nn vad end检测
         {
             gCiasAiotRunParam.is_vad_on_flag = false;
-#if UPLOAD_PCM_DATA_ENABLE && UPLOAD_PCM_VAD_TAG_ENABLE
-            short vad_end_tag = -32767;
-            voice_data_packet_and_send(PCM_MIDDLE, &vad_end_tag, 2);
-#endif
             ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_IDLE);
             if (!asr_reseult_wakup_flag)
             {
@@ -156,9 +152,6 @@ void vad_state_handle_task(void *p_arg)
             {
                 gCiasAiotRunParam.is_vad_on_flag = false;
                 mprintf("\r\n-----force vad end-----\r\n");
-                // short vad_end_tag = -28000;
-                // voice_data_packet_and_send(PCM_MIDDLE, &vad_end_tag, 2);
-                // ciss_set(CI_SS_VOX_VAD_CLEAR, 1);
                 ciss_set(CI_SS_VOX_VAD_STATE, CI_SS_VAD_IDLE);
                 ciss_set(CI_SS_VOX_VAD_FORCE_END, 0);
                 cias_aiot_vad_end_handle(0x0);

@@ -18,6 +18,7 @@
 #include "ci130x_system.h"
 #include "board.h"
 #include "stdbool.h"
+#include "user_config.h"
 
 #define LOG_7243E_DEBUG LOG_USER
 
@@ -368,11 +369,11 @@ void es7243e_init(bool is_linein)
     memset((void*)&alc_cfg_str,0,sizeof(es7243e_alc_config_t));
     if(is_linein)
     {
-        alc_cfg_str.max_gain = 14.0f;
+        alc_cfg_str.max_gain = OUTSIDE_CODEC_GAIN;
     }
     else
     {
-        alc_cfg_str.max_gain = 14.0f;
+        alc_cfg_str.max_gain = OUTSIDE_CODEC_GAIN;
     }
     #if AUTO_GET_AEC_GAIN
     es7243e_init_gain = alc_cfg_str.max_gain;

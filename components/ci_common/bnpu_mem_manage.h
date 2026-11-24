@@ -8,6 +8,7 @@
 #include "remote_api_for_bnpu.h"
 #include "ci130x_nuclear_com.h"
 #include "sdk_default_config.h"
+#define CI_ALIGH_4BYTE(size)   (((size) + 3)& ~3)    //4字节对齐-非负数
 
 void *bnpu_remote_malloc(size_t malloc_size);
 void *bnpu_remote_calloc(size_t num, size_t size);

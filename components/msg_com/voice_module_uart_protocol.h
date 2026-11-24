@@ -57,9 +57,6 @@ typedef struct
 #define VMUP_MSG_TYPE_CMD_DOWN (0xA1)
 #define VMUP_MSG_TYPE_ACK      (0xA2)
 #define VMUP_MSG_TYPE_NOTIFY   (0xA3)
-#if USE_IR_ENABLE
-#define VMUP_MSG_TYPE_TEST     (0xA4)
-#endif
 
 /*msg_cmd*/
 #define VMUP_MSG_CMD_ASR_RESULT    (0x91)           //报告语音识别结果

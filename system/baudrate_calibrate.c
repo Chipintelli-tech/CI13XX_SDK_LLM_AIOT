@@ -108,7 +108,7 @@ void baudrate_calibrate_set_ack()
 void task_baudrate_calibrate(void *p_arg)
 {
     int wait_count = 0;
-    vTaskDelay(pdMS_TO_TICKS(1));
+    vTaskDelay(1);
     bc_info.status = BC_START;
     while(1)
     {

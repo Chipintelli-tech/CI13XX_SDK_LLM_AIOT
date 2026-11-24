@@ -530,9 +530,9 @@ int32_t spic_protect(spic_base_t spic,FunctionalState cmd)
     }
     else
     {
-          reg1 &= ~(0xF << 2);
-          reg1 |= (0xB << 2);//保护前256K
-          reg2 &= ~(0x1 << 6);//CMP =0
+          reg1 &= ~(0x1F << 2);
+          reg1 |= (0x3 << 2);//保护后256K以外内容
+          reg2 |= (0x1 << 6);//CMP = 1
     }
     reg3 &= ~(0x3 << 5);
     reg3 |= (spi_flash_drv0_drv1 << 5);

@@ -65,7 +65,7 @@ int send_asr_pre_confirm_msg(uint32_t cmd_handle)
 }
 int set_post_min_cnt()
 {
-    return POST_MIN_CNT;
+    return RECALL_MIN_CNT;
 }
 
 int asr_result_callback(callback_asr_result_type_t *asr)
@@ -162,7 +162,7 @@ int asr_result_callback(callback_asr_result_type_t *asr)
                 ciss_set(CI_SS_WAKE_UP_VALID_FRAME_LEN_FOR_DOA,  asr->vocie_valid_frame_len);
             }
         #endif
-        #if GCC_DOA_OUT_TYPE
+        #if GCC_DOA_OUT_TYPE && USE_GCC_DOA
         extern int ci_get_doa_angle(void);
         int angle = ci_get_doa_angle();
         mprintf("--------doa angle: %d°\n", angle);

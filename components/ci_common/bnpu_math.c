@@ -1,6 +1,5 @@
 
 #include "bnpu_math.h"
-//#include "ci130x_npu.h"
 
 float tansig_table[201] = {
 0.000000f, 0.039979f, 0.079830f, 0.119427f, 0.158649f,

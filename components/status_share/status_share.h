@@ -27,7 +27,7 @@ typedef enum
     CI_SS_VOX_VAD_STATE,            //前端VOX vad状态 1-vad start 2-vad end
     CI_SS_VOX_VAD_CLEAR,            //清除vad数据状态重新计算
     CI_SS_VOX_VAD_FORCE_END,        //超时停止上传vad数据
-    CI_SS_VOX_SET_END_CONFIDENCE,   //设置vox vad end 静音时间
+    CI_SS_NN_VAD_PARAM_SET,         //设置NN VAD参数更新标志
     CI_SS_VOX_SET_THR_VAL,          //设置vox语音阈值
 	CI_SS_NNVAD_IS_OPEN,            //开启nn vad 检测
     CI_SS_AEC_WORK_STATE,           //aec工作状态设置
@@ -63,6 +63,7 @@ typedef enum
 
     CI_SS_PLAY_TYPE,                //目前正在播放的类型
     CI_SS_AEC_ALC_STATE,
+    CI_SS_AEC_TOP_CLIP,              //AEC防削顶使能
     CI_SS_AUDIO_IN_BUFFER_NUM,       //audio buffer num
     CI_SS_HOST_PARAM_SET_OK,         //主要端参数设置完成ok-0x5A
     CI_SS_ALC_AUTO_SWITCH_EN,        //动态ALC使能
@@ -75,7 +76,8 @@ typedef enum
     CI_SS_WMAN_VPR_EN,               //男女声纹使能
     CI_SS_SED_EN,                    //事件检测使能
     CI_SS_ASR_EN,                    //开启识别功能
-    CI_SS_TWO_CODEC_IS_USED,
+    CI_SS_DUAL_ALG_IS_USED,
+    CI_SS_DMIC_AND_INNER_REF,
     CI_SS_DUALMIC_IS_ANY,
 	CI_SS_ASR_ROLL_FRM,              //ASR识别回退帧数
     CI_SS_CWSL_IN_REG,               //自学习是否在学习状态。
@@ -153,6 +155,18 @@ typedef enum
 
 typedef enum
 {
+    CI_SS_NN_VAD_PARAM_IDLE = 0,    //未修改NN VAD参数
+    CI_SS_NN_VAD_PARAM_SEN_LEVEL,   //设置NN VAD 灵敏等级
+    CI_SS_NN_VAD_PARAM_OUT_END_EN,  //设置NN VAD 超时结束使能
+    CI_SS_NN_VAD_PARAM_OUT_END,     //设置NN VAD 超时结束时间
+    CI_SS_NN_VAD_PARAM_VALID_FRAME, //设置NN VAD 有效帧数
+    CI_SS_NN_VAD_PARAM_END_DELAY,   //设置NN VAD 结束时间，后窗
+    CI_SS_NN_VAD_PARAM_MIN_SPEECH,  //设置NN VAD 最小人声能量
+    CI_SS_NN_VAD_PARAM_UPLOAD_MODE, //设置NN VAD 有效检查模式
+} ci_ss_nn_vad_param_state_t;
+
+typedef enum
+{
     CI_SS_NO_WAKEUP = 0,        //当前系统处于非唤醒状态
     CI_SS_WAKEUPED,             //当前系统处于唤醒阶段
     CI_SS_WAKEUP_NULL,
@@ -169,7 +183,7 @@ typedef enum
 {
     CI_SS_PLAY_STATE_IDLE = 0,          //当前未播报
     CI_SS_PLAY_STATE_PLAYING,           //当前处于播报状态
-    CI_SS_PLAY_STATE_PLAYING_TO_IDLE,   //当前处于播报到停止播报状态
+    CI_SS_PLAY_STATE_PLAYING_TO_IDLE,   //当前处于播报到停止播报状态(AEC算法时使用该状态来停止播报)
 } ci_ss_play_state;
 
 typedef enum

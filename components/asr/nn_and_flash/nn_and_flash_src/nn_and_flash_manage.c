@@ -297,15 +297,6 @@ void cinn_wait_sem_creat(void)
 }
 
 
-void req_cinn_clear(void)
-{
-    cinn_wait_sem_creat();
-    nn_and_flash_manage_msg_t msg;
-    memset((void*)&msg,0,sizeof(msg));
-    msg.nn_or_flash = NN_AND_FLASH_REQ_NN_CLEAR;
-    nn_and_flash_manage_send_queue(&msg);
-}
-
 
 void cinn_wait_clear_done(void)
 {
@@ -487,22 +478,6 @@ void nn_and_flash_manage_task(void* p)
                     flash_manage_flow(&(msg.flash_ctr_info));
                     break;
                 }
-                #if CI_NN_V2_EN
-                case NN_AND_FLASH_REQ_NN_CLEAR:
-                {
-                    cinn_wait_sem_creat();
-                    xSemaphoreGive(nn_clear_xSemaphore);
-                    break;
-                }
-                case NN_AND_FLASH_REQ_NN_INIT:
-                {
-                    cinn_init_sem_creat();
-                    int cha_num = msg.nn_ctr_info.cinn_cmp_info.cha_num;
-                    extern void cinn_model_init(int cha_num);
-                    xSemaphoreGive(nn_init_xSemaphore);
-                    break;
-                }
-                #endif
                 default:
                 {
                     NNFM_CI_ASSERT(0,"\n");

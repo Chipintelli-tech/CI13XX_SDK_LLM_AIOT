@@ -12,6 +12,7 @@
 #ifndef _CI_NVDATA_MANGE_H_
 #define _CI_NVDATA_MANGE_H_
 
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C"{
@@ -23,6 +24,12 @@ extern "C"{
 ****************************************************************************/
 
 /*ID don't use 0xFF000000 to 0xFFFFFFFF*/
+/*保留ID段:高8位为0xFF(0xFF000000~0xFFFFFFFF)。该区间与擦除态flash(全0xFF)
+  及"空槽/未使用"哨兵值冲突,严禁作为NV项ID,接口入参会被直接拒绝*/
+#define CINV_ID_RESERVED_PREFIX         (0xFF000000u)
+#define CINV_ID_RESERVED_MASK           (0xFF000000u)
+#define CINV_ID_IS_VALID(id)            ((((uint32_t)(id)) & CINV_ID_RESERVED_MASK) != CINV_ID_RESERVED_PREFIX)
+
 #define NVDATA_ID_VOLUME                 0x50000001 /*'VOLU'*/
 #define NVDATA_ID_CWSL_START             0x50001000 /*CWSL*/
 
@@ -60,6 +67,7 @@ typedef enum
     CINV_OPER_FAILED,/*!< Id already existed, no action taken  */
     CINV_OPER_SUCCESS,/*!< Failure to find or create id  */
     CINV_ITEM_LEN_ERR,/*!< Item length error */
+    CINV_ITEM_ID_ERR,/*!< Reserved/invalid item id (0xFF000000~0xFFFFFFFF) */
 }cinv_item_ret_t;
 
 void cinv_init(uint32_t flash_addr, uint32_t size);

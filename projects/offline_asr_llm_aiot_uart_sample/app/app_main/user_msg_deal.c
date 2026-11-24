@@ -9,7 +9,6 @@
 #include "ci_log.h"
 #include "ci130x_gpio.h"
 #include "voice_print_recognition.h"
-#include "device.h"
 #include "ci130x_dpmu.h"
 #include "user_msg_deal.h"
 #include "cias_network_msg_protocol.h"
@@ -403,11 +402,6 @@ void userapp_initial(void)
     #if MSG_USE_I2C_EN
     i2c_communicate_init();
     #endif
-    #if USE_IR_ENABLE   //红外任务初始化
-    ir_task_init(); 
-    get_flash_eut_state();   //获取下自动测试状态
-    xTaskCreate(DeviceTaskProcess, "DeviceTaskProcess", 300, NULL, 4, NULL);
-    #endif
 
     ///tag-gpio-init
 #if ENABLE_MOTOR_DOA
@@ -542,6 +536,7 @@ uint32_t deal_asr_msg_by_cmd_id(sys_msg_asr_data_t *asr_msg, cmd_handle_t cmd_ha
         gCiasAiotRunParam.play_cloud_data_flag = false;
         gCiasAiotRunParam.rcv_cloud_play_data_flag = false;
         gCiasAiotRunParam.cloud_play_data_total_len = 0;
+        if(!gCiasAiotRunParam.is_vad_ending_flag)
         gCiasAiotRunParam.stop_collect_pcm_flag = false;
     break;     
     ///tag-asr-msg-deal-by-cmd-id-end

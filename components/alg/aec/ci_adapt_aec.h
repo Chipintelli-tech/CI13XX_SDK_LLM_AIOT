@@ -32,9 +32,10 @@ typedef struct
     int aggr_mode; //默认1，算法处理的效果等级：0，1，2，处理效果依次增强，算力内存也会依次增大
     float aec_gain;//增益数值
     float aec_enable_threshold;//门限值
-    int alc_off_codec_adc_gain_mic; 
-    int alc_off_codec_adc_gain_ref;
-    
+    int alc_off_codec_adc_gain_l; 
+    int alc_off_codec_adc_gain_r;
+    int pre_codec_adc_gain_l;
+    int pre_codec_adc_gain_r;
     aec_control_mode_t aec_control_mode ;
     float dtd_ratio;//coh比例系数
 }aec_config_t;
@@ -61,7 +62,13 @@ extern "C" {
      * @return void*                NULL:失败;其它:成功.
      */
     void* ci_aec_create(void* module_config);
-
+    /**
+     * @brief                       复位aec模块句柄内的参数
+     * 
+     * @param handle                模块句柄
+     * @return void                 无
+     */
+    void ci_aec_para_reset(void* handle);
     /**
      * @brief           释放模块
      * 

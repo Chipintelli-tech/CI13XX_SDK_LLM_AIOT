@@ -32,6 +32,7 @@ typedef struct
     bool     is_wake_up_flag;              //唤醒标志
     bool     is_vad_on_flag;               //vad start
     bool     is_vad_force_on_flag;         //强制录音
+    bool     is_vad_ending_flag;           //正在结束VAD标志
     volatile bool speex_compress_is_busy;       //speex正在压缩
     bool     pcm_upload_is_busy;          //pcm数据正在上传
     bool     compress_pcm_to_wifi_flag;    //开始压缩数据到WiFi标标志
@@ -81,8 +82,8 @@ typedef struct
 //功能参数定义
 typedef struct 
 {
-    uint16_t vad_filter_frame;                      //vad start和end之间过滤音频帧数，低于该值则不上传云端
-    uint16_t vad_end_mute_param_index;              //vad end产生静音设置参数索引
+    // uint16_t vad_filter_frame;                      //vad start和end之间过滤音频帧数，低于该值则不上传云端
+    // uint16_t vad_end_mute_param_index;              //vad end产生静音设置参数索引
     uint16_t vad_end_mute_frame;                    //vad end产生静音帧数(10ms一帧)
     uint16_t vad_start_max_timeout;                 //vad start后最大超时时间(S)
     uint16_t wake_up_continue_timeout;              //wake up持续唤醒超时时间(S)

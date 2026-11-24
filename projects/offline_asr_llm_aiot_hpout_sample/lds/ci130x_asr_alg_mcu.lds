@@ -42,9 +42,9 @@ BOOT_PARAMETER_SIZE        = 0x200;
 SHARE_SRAM_ADDR            = 0x1ff50C00;
 SHARE_SRAM_SIZE            = 0x400;
 SRAM_START_ADDR            = 0x1ff51000;
-SRAM_END_ADDR              = 0x1ffbfc00;
+SRAM_END_ADDR              = 0x1ffba000;
 SRAM_SIZE                  = (SRAM_END_ADDR - SRAM_START_ADDR);
-SYS_HEAP_SIZE              = (1024*130);
+SYS_HEAP_SIZE              = (1024*150);
 
 /* ASSERT((SRAM_END_ADDR - SRAM_START_ADDR) == (ROM_SIZE + FHEAP_SIZE + ASR_USED_SIZE + RAM_SIZE), "RAM config error!"); */
 

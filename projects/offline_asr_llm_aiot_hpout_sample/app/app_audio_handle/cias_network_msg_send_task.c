@@ -157,71 +157,6 @@ int32_t cias_send_cmd_and_data(uint32_t cmd_type, uint8_t *buf, int32_t len, uin
 
 
 /**
- * @brief 打包发送音频数据
- * 
- * @param packet_type 数据包类型
- * @param voice_data 音频数据
- * @param packet_len 数据长度
- * @return int -1 错误， 返回包长度
- */
-int voice_data_packet_and_send(uint32_t packet_type,uint8_t *voice_data, int32_t packet_len)
-{
-    static int32_t buff_count = 0;
-    sdio_task_msg_t send_msg;
-    
-    broadlink_frame_create(packet_type, voice_data, packet_len, (broad_link_buf + buff_count * NETWORK_SEND_BUFF_MAX_SIZE), NETWORK_SEND_BUFF_MAX_SIZE, 0x12345678,0);
-    send_msg.network_data.payload = (uint32_t)(broad_link_buf + buff_count * NETWORK_SEND_BUFF_MAX_SIZE);
-    send_msg.msg_type = SDIO_DMA_SEND;
-    send_msg.network_data.type = AUDIO_MIDDLE;
-    send_msg.network_data.length = packet_len + 16;
-    send_msg.network_data.flag = 0;
-    if(pdPASS != send_msg_to_network_task(&send_msg,NULL))
-    {
-        mprintf("sdio err3\n");
-    }
-    buff_count++;
-    if(buff_count >= NETWORK_SEND_BUFF_NUM)
-    {
-        buff_count = 0;
-    }
-
-    return 0;
-}
-
-/**
- * @brief 打包发送cjson
- * 
- * @param packet_type   数据包类型
- * @param data          cjson数据
- * @param packet_len    数据长度
- * @return int -1 错误，返回包长度
- */
-int cias_cjson_packet_and_send(uint32_t packet_type,uint8_t *data, int32_t packet_len)
-{
-    static int32_t buff_count = 0;
-    sdio_task_msg_t send_msg;
-    
-    broadlink_frame_create(CIAS_CJSON_DATA, data, packet_len, (broad_link_buf + buff_count * NETWORK_SEND_BUFF_MAX_SIZE), NETWORK_SEND_BUFF_MAX_SIZE, 0x12345678,0);
-    send_msg.network_data.payload = (uint32_t)(broad_link_buf + buff_count * NETWORK_SEND_BUFF_MAX_SIZE);
-    send_msg.msg_type = SDIO_DMA_SEND;
-    send_msg.network_data.type = AUDIO_MIDDLE;
-    send_msg.network_data.length = packet_len + 16;
-    send_msg.network_data.flag = 0;
-    if(pdPASS != send_msg_to_network_task(&send_msg,NULL))
-    {
-        ci_logdebug(LOG_MEDIA,"sdio err3\n");
-    }
-    
-    buff_count++;
-    if(buff_count >= NETWORK_SEND_BUFF_NUM)
-    {
-        buff_count = 0;
-    }
-    return 0;
-}
-
-
-/**
  * @brief 串口发送任务
  * 
  * @param p_arg 
@@ -255,12 +190,6 @@ void network_send_data_task(void *p_arg)
                     }
                     else
                     {
-                    //    mprintf("data->length = %d\r\n", data->length);
-                    //    uint8_t *p = (int8_t *)data->payload;
-                    //    for(int i = 0; i < data->length; i++)
-                    //    {
-                    //         mprintf("%02x", (uint8_t)p[i]);
-                    //    }
                        ret = network_send((int8_t *)data->payload, data->length);
                     }
                     break;
@@ -284,12 +213,5 @@ int32_t cias_send_cmd_and_data(uint32_t cmd_type, uint8_t *buf, int32_t len, uin
 {
     return 0;
 }
-int voice_data_packet_and_send(uint32_t packet_type,uint8_t *voice_data, int32_t packet_len)
-{
-    return 0;
-}
-int cias_cjson_packet_and_send(uint32_t packet_type,uint8_t *data, int32_t packet_len)
-{
-    return 0;
-}
+
 #endif

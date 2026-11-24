@@ -10,6 +10,7 @@ build/source_file.mk: source_file.prj
 	# sh $(SDK_PATH)/tools/generate_makefile.sh
 	$(LUA) $(SDK_PATH)/utils/generate_makefile.lua source_file.prj $(SDK_PATH)
 
+include $(SDK_PATH)/utils/common_firmware.mk
 clean:
 	-$(RM) -rf build/*
 	-$(RM) -rf *.a

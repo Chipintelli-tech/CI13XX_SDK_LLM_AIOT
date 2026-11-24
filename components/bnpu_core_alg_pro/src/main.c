@@ -37,7 +37,7 @@
 /* 音频输入任务句柄及系统监控id */
 uint8_t audio_in_preprocess_mode_id;
 TaskHandle_t audio_in_preprocess_mode_handle;
-
+bool g_bnpu_init_flag = false;
 /**
  * @brief 硬件初始化
  *          这个函数主要用于系统上电后初始化硬件寄存器到初始值，配置中断向量表初始化芯片io配置时钟
@@ -170,6 +170,7 @@ static void task_init(void *p_arg)
         CI_ASSERT(0, "\n");
     }
     #endif
+    g_bnpu_init_flag = true;
     /* ASR系统启动任务 */
 	#if !NO_ASR_FLOW
 	xTaskCreate(asr_system_startup_task,"asr_system_startup_task",512,NULL,4,NULL);
@@ -207,8 +208,8 @@ static void task_init(void *p_arg)
                     (int)StatusArray[i].usStackHighWaterMark);
             }
             mprintf("\n\n");
-            mprintf("HEAP free:%d\n",xPortGetFreeHeapSize());
-            mprintf("HEAP_644 free:%d\n",xPortGetFreeHeapSize_644());
+            mprintf("bnpu HEAP free:%d\n",xPortGetFreeHeapSize());
+            //mprintf("HEAP_644 free:%d\n",xPortGetFreeHeapSize_644());
             xTaskResumeAll();
             vTaskDelay(pdMS_TO_TICKS(10000));
         }

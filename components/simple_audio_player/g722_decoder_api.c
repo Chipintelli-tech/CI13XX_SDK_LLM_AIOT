@@ -17,10 +17,10 @@ static void docoder_deinit(void* decoder_haldle)
 
 static int get_info(void* decoder_handle, uint8_t *data, int *bytes_left, uint8_t *pcm_buf, audio_format_info_t *format_info)
 {
-    format_info->samprate = 16000;
-    format_info->bits_per_sample = 16;
-    format_info->channels = 1;
-    format_info->samples_per_frame = 320;
+    format_info->samprate = NET_AUDIO_PCM_G722_SAMPLE_RATE;
+    format_info->bits_per_sample = NET_AUDIO_PCM_G722_SAMPLE_DEPTH;
+    format_info->channels = NET_AUDIO_PCM_G722_CHANNEL_FLAG;
+    format_info->samples_per_frame = NET_AUDIO_G722_FRAME_SIZE;
     format_info->src_data_size = 0;
     return 0;
 }
@@ -29,12 +29,12 @@ static int decode_one_frame(void* decoder_handle, uint8_t *data, int *bytes_left
 {
     int ret = 0;
 
-    int decoded_size = WebRtc_g722_decode(decoder_handle, pcm_buf, data, 160); // 320 samples
+    int decoded_size = WebRtc_g722_decode(decoder_handle, pcm_buf, data, (NET_AUDIO_G722_FRAME_SIZE/2)); // 160字节及为320 samples
     if (pcm_data_size)
     {
         *pcm_data_size = decoded_size*sizeof(short);
     }
-    *bytes_left -= 160;
+    *bytes_left -= (NET_AUDIO_G722_FRAME_SIZE/2);
     return ret;
 }
 

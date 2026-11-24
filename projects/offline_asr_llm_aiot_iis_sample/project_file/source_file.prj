@@ -90,6 +90,10 @@ source-file: components/VPR/voice_print_wman_recognition.c
 source-file: components/msg_com/voice_module_uart_protocol_g1.c
 source-file: components/msg_com/i2c_protocol_module.c
 source-file: components/msg_com/voice_module_uart_protocol.c
+
+source-file: components/ci_tools/aec_gain_tools.c
+source-file: components/ci_tools/uart_dump_tools.c
+
 //factory ir_test
 source-file: components/factory_test/cias_factory_test.c
 
@@ -139,30 +143,8 @@ source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_doa/doa_app_handle
 source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_cwsl/cwsl_app_handle.c
 source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_sed/sed_app_host.c
 
-//ir function
-source-file: components/ir_remote_driver/ir_remote_driver.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device/air_device.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device/common_api.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device/device_key.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device/device_task.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device/device.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device/fan_device.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device/light_device.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device/main_device.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device/tv_device.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/LinkMsgProc/ir_uart_msg_deal.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/LinkMsgProc/LinkMsgProc.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/buzzer_voice.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/middle_device.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/eut_test/eut_fun_test.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/ir_led_light.c
-source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/ir_test_protocol.c
-
-
 
 //source-file: projects/offline_asr_llm_aiot_iis_sample/app/app_main/ci_nlp_user.c
-
-library-file: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/ir_src/libir_data.a
 
 library-file: $(LIBS_PATH)/libnewlib_port.a 
 library-file: $(LIBS_PATH)/libfreertos_port.a
@@ -392,6 +374,7 @@ include-path: components/asr/nn_and_flash/nn_and_flash_inc
 include-path: components/fft
 include-path: components/nlp
 include-path: components/protocol
+include-path: components/ci_tools
 
 include-path: components/msg_com
 include-path: components/led
@@ -441,14 +424,6 @@ include-path: components/ci_common
 include-path: components/ci_cwsl_v2
 include-path: components/alg/pwk/
 include-path: components/ir_remote_driver
-
-//ir function
-include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_ir
-include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/LinkMsgProc
-include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/ir_src
-include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/device
-include-path: projects/offline_asr_llm_aiot_iis_sample/app/app_ir/eut_test
-
 
 //factory ir_test
 include-path: components/factory_test/

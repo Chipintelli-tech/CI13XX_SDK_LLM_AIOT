@@ -153,6 +153,26 @@ static uint32_t g_flash_base_addr; /*start addr of nvdata in flash */
 static uint16_t g_feb_total_count; /*flash total used size is CINV_FLASH_ERASE_BLOCK_SIZE*g_feb_total_count*/
 
 
+/**
+ * @brief 公共NV接口的item id入参校验
+ *
+ * @param id 待校验id
+ * @return true  合法id
+ * @return false 保留/非法id(0xFF000000~0xFFFFFFFF,与擦除态flash/空槽哨兵冲突)
+ *
+ * @note 非法id来自上层应用入参,属可预期的运行期错误,这里只记录日志并返回false,
+ *       由调用方返回CINV_ITEM_ID_ERR,不使用CI_ASSERT(会死循环/复位设备)。
+ */
+static bool cinv_id_param_check(uint32_t id)
+{
+    if (!CINV_ID_IS_VALID(id))
+    {
+        mprintf("\033[31minvalid nv item id:0x%08x\033[0m\n", (unsigned int)id);
+        return false;
+    }
+    return true;
+}
+
 
 static void poweroff_random_test(uint32_t pos)
 {
@@ -268,7 +288,14 @@ static void hotid_init(void)
  */
 cinv_item_ret_t cinv_register_hotid(uint32_t hot_id)
 {
-    cinv_hotid_node_t * new_node = (cinv_hotid_node_t *)pvPortMalloc(sizeof(cinv_hotid_node_t));
+    cinv_hotid_node_t * new_node;
+
+    if (!cinv_id_param_check(hot_id))
+    {
+        return CINV_ITEM_ID_ERR;
+    }
+
+    new_node = (cinv_hotid_node_t *)pvPortMalloc(sizeof(cinv_hotid_node_t));
     if (new_node)
     {
         new_node->hot_id = hot_id;
@@ -1363,6 +1390,11 @@ cinv_item_ret_t cinv_item_init(uint32_t id, uint16_t len, void *buf)
         return CINV_ITEM_LEN_ERR;
     }
 
+    if (!cinv_id_param_check(id))
+    {
+        return CINV_ITEM_ID_ERR;
+    }
+
     cinv_port_mutex_take();
     cinv_port_flash_used_request();
 
@@ -1422,7 +1454,12 @@ cinv_item_ret_t cinv_item_write(uint32_t id, uint16_t len, void *buf)
     {
         return CINV_ITEM_LEN_ERR;
     }
-    
+
+    if (!cinv_id_param_check(id))
+    {
+        return CINV_ITEM_ID_ERR;
+    }
+
     cinv_port_mutex_take();
     cinv_port_flash_used_request();
 
@@ -1487,6 +1524,11 @@ cinv_item_ret_t cinv_item_read(uint32_t id, uint16_t len, void *buf, uint16_t *r
 
     item_len = item_len > CINV_IO_BUFFER_SIZE ? CINV_IO_BUFFER_SIZE:item_len;
 
+    if (!cinv_id_param_check(id))
+    {
+        return CINV_ITEM_ID_ERR;
+    }
+
     cinv_port_mutex_take();
     cinv_port_flash_used_request();
 
@@ -1541,6 +1583,11 @@ cinv_item_ret_t cinv_item_delete(uint32_t id)
     uint16_t offset;
     uint16_t blk;
     cinv_item_ret_t ret = CINV_OPER_SUCCESS;
+
+    if (!cinv_id_param_check(id))
+    {
+        return CINV_ITEM_ID_ERR;
+    }
 
     cinv_port_mutex_take();
     cinv_port_flash_used_request();

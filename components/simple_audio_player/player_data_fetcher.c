@@ -147,7 +147,11 @@ void task_data_fetch(void *pvParameters)
                             ret = false;
                             if(CI_SS_PLAY_STATE_PLAYING == ciss_get(CI_SS_PLAY_STATE))
                             {
+                                #if USE_AEC_MODULE
                                 ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_PLAYING_TO_IDLE); // 设置播放结束
+                                #else
+                                ciss_set(CI_SS_PLAY_STATE, CI_SS_PLAY_STATE_IDLE); // 设置播放结束
+                                #endif
                             }
                             if (!gCiasAiotFuncParam.upload_play_full_duplex)
                             {
@@ -270,7 +274,7 @@ int32_t pdf_fetch_data(void *buffer, uint32_t buffer_size, TickType_t xTicksToWa
     do 
     {
         //请求任务删除
-        if (data_fetch_task_info.eos)
+        if (data_fetch_task_info.eos || data_fetch_task_info.data_buffer == NULL)
         {
             bytes_read = -1;
             break;

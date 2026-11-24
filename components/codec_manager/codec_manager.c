@@ -346,18 +346,9 @@ static int config_iis_dma(codec_info_t * p_codec_info, io_direction_t io_dir)
     {
         if (CODEC_INPUT == io_dir)   //录音时钟
         {
-            if(IIS0 == p_iis_info->IISx)
-            {
-                cap_iis_clk_str.mclk_cfg.src = IIS_MCLK_SOURCE_SRC2;
-                cap_iis_clk_str.mclk_cfg.mclk = IIS_MCLK_MCLK2;
-                cap_iis_clk_str.clk_cfg = IIS_CLK_SOURCE_MCLK2;
-            }
-            else
-            {
-                cap_iis_clk_str.mclk_cfg.src = IIS_MCLK_SOURCE_SRC0;
-                cap_iis_clk_str.mclk_cfg.mclk = IIS_MCLK_MCLK0;
-                cap_iis_clk_str.clk_cfg = IIS_CLK_SOURCE_MCLK0;
-            }
+            cap_iis_clk_str.mclk_cfg.src = IIS_MCLK_SOURCE_SRC0;
+            cap_iis_clk_str.mclk_cfg.mclk = IIS_MCLK_MCLK0;
+            cap_iis_clk_str.clk_cfg = IIS_CLK_SOURCE_MCLK0;
         }
         else   //播音
         {
@@ -366,12 +357,12 @@ static int config_iis_dma(codec_info_t * p_codec_info, io_direction_t io_dir)
             cap_iis_clk_str.clk_cfg = IIS_CLK_SOURCE_MCLK1;
         }
 
-        // if(IIS0 == p_iis_info->IISx)  //采音
-        // {
-        //     cap_iis_clk_str.mclk_cfg.src = IIS_MCLK_SOURCE_SRC2;
-        //     cap_iis_clk_str.mclk_cfg.mclk = IIS_MCLK_MCLK2;
-        //     cap_iis_clk_str.clk_cfg = IIS_CLK_SOURCE_MCLK2;
-        // }
+        if(IIS0 == p_iis_info->IISx)  //采音
+        {
+            cap_iis_clk_str.mclk_cfg.src = IIS_MCLK_SOURCE_SRC2;
+            cap_iis_clk_str.mclk_cfg.mclk = IIS_MCLK_MCLK2;
+            cap_iis_clk_str.clk_cfg = IIS_CLK_SOURCE_MCLK2;
+        }
 
         if(get_iis_pad_for_clk_input_flag())
         {//如果IIS0（即IIS PAD）配置为slave，IIS PAD不能作为IIS1、IIS2的观测

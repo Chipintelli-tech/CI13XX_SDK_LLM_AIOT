@@ -204,7 +204,7 @@ static int alg_cloud_protocol_init(void)
 //双核交互参数初始化
 static void ciss_param_init(void)
 {
-    ciss_set(CI_SS_ASR_ROLL_FRM, VAD_ROLL_FRM);      //ASR回退帧数
+    ciss_set(CI_SS_ASR_ROLL_FRM, VAD_START_BACK_FRAMES);      //ASR回退帧数
     #if NO_ASR_FLOW
     ciss_set(CI_SS_ASR_EN, 0);
     #else
@@ -268,34 +268,60 @@ static void ciss_param_init(void)
     // ciss_set(CI_SS_DOA_INIT_STATE, 1);
     // #endif
 	ciss_set(CI_SS_VOX_WORK_STATE, 1);
-//	ciss_set(CI_SS_VOX_SET_END_CONFIDENCE, VOX_VAD_END_CONFIDENCE_DEFAULT);
+    ciss_set(CI_SS_VOX_VAD_CHECK,CI_SS_NN_VAD_IDLDE);
     ciss_set(CI_SS_ALG_DEBUG_STATE, 0);           //开启前端算法调试
     //注册语音前段信号处理模块
     #if USE_DUAL_MIC_ANY
     ciss_set(CI_SS_DUALMIC_IS_ANY,true);
     ciss_set(CI_SS_ANY_MIC_AEC_PCM_THR_VAL, 100);
-    cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT,  DISABLE);   //禁用alc，设置固定增益为20
-    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, 20);
-    cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT,  DISABLE);
-    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, 20);
     #else
     ciss_set(CI_SS_DUALMIC_IS_ANY,false);
     #endif
+    //双麦算法禁用alc，设置固定增益
+    #if OFFLINE_DUAL_MIC_ALG_SUPPORT
+    #if!REF_IN_FROM_INNER_CODEC
+    cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT,  DISABLE);   
+    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, PGA_GAIN_L);
+    cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT,  DISABLE);
+    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, PGA_GAIN_R);
+    #endif
+    ciss_set(CI_SS_DUAL_ALG_IS_USED, true);
+    #else
+    ciss_set(CI_SS_DUAL_ALG_IS_USED, false);
+    #endif
+
+    #if REF_IN_FROM_INNER_CODEC
+    ciss_set(CI_SS_DMIC_AND_INNER_REF, true);
+    #else
+    ciss_set(CI_SS_DMIC_AND_INNER_REF, false);
+    #endif
+
      /*DNN配置*/
     ciss_set(CI_SS_DNN_TASK_ASR_REG_EN, 1);
     bnpu_dnn_param_cfg();
     ciss_set(CI_SS_DNN_HOST_CFG_READY, 1);      //需要在asr,降噪等dnn功能配置完后再ready
     ciss_set(CI_SS_AUDIO_IN_BUFFER_NUM, AUDIO_IN_BUFFER_NUM);  //2M模型，buffer至少设置为20
     ciss_set(CI_SS_DECODER_MIN_ACTIVE, DECODER_MIN_ACTIVE);
-    #if DEEP_SEPARATE_ENABLE
-    ciss_set(CI_SS_CHA_NUM, 2);
-    #else 
     ciss_set(CI_SS_CHA_NUM, 1);
-    #endif
+
     
     float beam = DECODER_BEAM;
     ciss_set(CI_SS_DECODER_BEAM,*(uint32_t*)&beam);
 	
+}
+void volume_init(void)
+{
+    uint8_t volume;
+    uint16_t real_len;
+    /* 从nvdata里读取播放音量 */
+    if(CINV_OPER_SUCCESS != cinv_item_read(NVDATA_ID_VOLUME, sizeof(volume), &volume, &real_len))
+    {
+        /* nvdata内无播放音量则配置为初始默认音量并写入nv */
+        volume = VOLUME_DEFAULT;
+        cinv_item_init(NVDATA_ID_VOLUME, sizeof(volume), &volume);
+    }
+    /* 音量设置 */
+    vol_set(volume);
 }
 static void task_init(void *p_arg)
 {
@@ -328,6 +354,9 @@ static void task_init(void *p_arg)
     extern audio_capture_t audio_capture;
     REMOTE_CALL(set_ssp_registe(&audio_capture, (ci_ssp_st*)&ci_ssp, sizeof(ci_ssp)/sizeof(ci_ssp_st)));
     REMOTE_CALL(set_freqvad_start_para_gain(VAD_SENSITIVITY));
+
+    volume_init();//初始化音量大小(及HPOUT输出的采音幅度大小)
+
     alg_model_init();                                               //初始化算法模型
     ciss_set(CI_SS_HOST_PARAM_SET_OK, BNPU_HOST_PARAM_SYNC_MAGIC);  //参数设置完成
     #if USER_CODE_SWITCH_ENABLE  //支持两份code动态切换
@@ -375,13 +404,13 @@ static void task_init(void *p_arg)
     extern void config_adpt_cnt(int enable);
     config_adpt_cnt(ADAPTIVE_CNT_ENABLE);
     extern void config_max_stop_cfd(int enable,int nocnt_max_stop_cfd,int cnt_max_stop_cfd);
-    config_max_stop_cfd(MAX_STOP_CFD_ENABLE,MAX_STOP_CFD_NOCNT,MAX_STOP_CFD_CNT);
+    config_max_stop_cfd(MAX_STOP_CFD_ENABLE,MAX_STOP_CFD_WITHOUT_CNT,MAX_STOP_CFD_WITH_CNT);
     extern void config_max_vad_end_frm(int max_vad_end_frm);
     config_max_vad_end_frm(MAX_STOP_VAD_FRM);
     extern int config_base_confidence_count(short base_confidence,unsigned char valid_count);
     config_base_confidence_count(DEFAULT_CONFIDENCE,DEFAULT_CNT);
     extern void config_recover_result(int enable,int mode,int max_frm);
-    config_recover_result(RECOVER_RESULT_ENABLE,RECOVER_RESULT_MODE,RECOVER_RESULT_MAX_FRM);
+    config_recover_result(RECALL_RESULT_ENABLE,RECALL_RESULT_MODE,RECALL_RESULT_MAX_FRM);
     extern void config_silprob_cnt(float base_silprob,int base_silcnt );
     config_silprob_cnt(DEFAULT_STOP_SILPROB, DEFAULT_STOP_SILCNT);
 
@@ -391,17 +420,22 @@ static void task_init(void *p_arg)
     #if USER_CODE_SWITCH_ENABLE
     xTaskCreate(uart_data_handle_task,"uart_data_handle_task", 480, NULL, 4, NULL);
     #endif
+    #if !PGA_ALC_AUTO_MODE_ENABLE
+    cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT,  DISABLE);
+    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, PGA_GAIN_L);
+    cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT,  DISABLE);
+    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, PGA_GAIN_R);
+    #endif
     #if (!COMMAND_LINE_CONSOLE_EN)
     //语音系统准备OK
     cias_send_cmd(CIAS_AUDIO_SYS_READY, DEF_FILL); 
     while(1)
     {
-        #if !DEBUG_AUDIO_UART_UPLOAD_EN
         UBaseType_t ArraySize = 20;
         TaskStatus_t *StatusArray;
         //ArraySize = uxTaskGetNumberOfTasks();
         StatusArray = pvPortMalloc(ArraySize*sizeof(TaskStatus_t));
-        if (StatusArray && ArraySize)
+        while (StatusArray && ArraySize)
         {
             uint32_t ulTotalRunTime;
             volatile UBaseType_t ArraySize2 = uxTaskGetSystemState(StatusArray, ArraySize, &ulTotalRunTime);
@@ -420,10 +454,9 @@ static void task_init(void *p_arg)
             mprintf("asr heap min free:%dKB\n", get_heap_bytes_remaining_size()/1024);
             mprintf("system heap min free:%dKB\n", xPortGetMinimumEverFreeHeapSize()/1024);
             mprintf("system heap free:%dKB\n", xPortGetFreeHeapSize()/1024);
+            vTaskDelay(pdMS_TO_TICKS(10000));
         }
-        vPortFree(StatusArray);
-        #endif
-        vTaskDelay(pdMS_TO_TICKS(10000));
+       
     }
     #else
     vTaskDelete(NULL);

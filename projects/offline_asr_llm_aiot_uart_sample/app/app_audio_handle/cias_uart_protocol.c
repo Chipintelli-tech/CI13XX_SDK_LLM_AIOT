@@ -81,13 +81,6 @@ int8_t network_send_Byte(int8_t ch)
         return 0;
     }
     UartPollingSenddata(UART_NUM_SEND_PLAY_AUDIO_NUMBER, ch);
-#if CI230X_AUDIO_DATA_OUT_BY_UART   //203x采音
-    if (UART_FLAGSTAT(HAL_UART2_BASE, UART_TXFF))
-    {
-        return 0;
-    }
-    UartPollingSenddata(HAL_UART2_BASE, ch);
-#endif
     return 1;
 }
 
@@ -121,9 +114,6 @@ int32_t network_send(int8_t *str, uint32_t length)
 int8_t network_uart_port_init(void)
 {
     UARTInterruptConfig(UART_NUM_SEND_PLAY_AUDIO_NUMBER, UART_NUM_SEND_PLAY_AUDIO_BAUDRATE);
-#if CI230X_AUDIO_DATA_OUT_BY_UART
-    UARTInterruptConfig(HAL_UART2_BASE, UART_BaudRate921600);
-#endif
     return 0;
 }
 #endif

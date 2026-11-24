@@ -1,4 +1,4 @@
--- parse_user_alg_config_mk.lua: 检查算法功能配置(system/user_alg_config.mk)相对 BNPU 工程构建快照(config.a)是否变化
+-- parse_user_alg_config_mk.lua: 检查算法功能配置文件(user_alg_config.mk)相对 BNPU 工程构建快照(config.a)是否变化
 --
 -- 用法:
 --   lua parse_user_alg_config_mk.lua check <user_alg_config.mk> <config快照文件>

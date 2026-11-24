@@ -157,18 +157,6 @@ uint32_t cmd_info_change_cur_model_group(uint8_t model_group_id)
 
         cmd_info_change_cur_model_group_inner(model_group_id);
         ci_loginfo(LOG_CMD_INFO, "change asr mode %d\n",model_group_id);
-        #if DEEP_SEPARATE_ENABLE && !BF_DEEPSE_MODE 
-        if(model_group_id == 0)
-        {
-            mprintf("set CI_SS_CMD_ASR_CHA_NUM 1\n");
-            ciss_set(CI_SS_CMD_ASR_CHA_NUM,1);
-        }
-        else
-        {
-            mprintf("set CI_SS_CMD_ASR_CHA_NUM 2\n");
-            ciss_set(CI_SS_CMD_ASR_CHA_NUM, 2);      
-        }
-        #endif
         uint32_t lg_model_addr;
         uint32_t lg_model_size;
         uint32_t ac_model_addr;

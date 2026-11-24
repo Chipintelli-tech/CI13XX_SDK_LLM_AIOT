@@ -27,20 +27,8 @@
 
 #define W_A_BUFFER_ADDR     (0x30000000)
 #define W_B_BUFFER_ADDR     (0x30004000)
-
-#if 0
-#if USE_VPR || USE_SED || USE_NN_DENOISE
-//这两个模块会用到NPU map起始的起始地址，需要单独处理
-#define NN_MAP_OFFSET_SIZE  (0*1024U)
-#else
-#define NN_MAP_OFFSET_SIZE  (0*1024U)
-#endif
-#endif
-
-#define NN_MAP_OFFSET_SIZE  (0*1024U)
-
-#define NN_MAP_START_ADDR   (0x1fff8000 + NN_MAP_OFFSET_SIZE)   //NPU的malloc的起始边界
-#define NN_MEM_MAP_SIZE     (32*1024U - NN_MAP_OFFSET_SIZE)     //NPU malloc的大小
+#define NN_MAP_START_ADDR   (0x1fff8000)   //NPU的malloc的起始边界
+#define NN_MEM_MAP_SIZE     (32*1024U)     //NPU malloc的大小
 #define NN_MAP_END_ADDR     (0x20000000)
 
 #define NN_TCM_START_ADDR   (0x1fff8000)                        //NPU的TCM从哪个地址开始

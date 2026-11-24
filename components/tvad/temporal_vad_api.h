@@ -136,11 +136,12 @@ bool tvad_set_min_speech_db(uint8_t min_db);
  * @param enable_val 1:使能 0：不使能
  * @return 无
  */
-void tvad_set_end_delay_enable(bool status);
+void tvad_set_out_time_enable(bool status);
 #if !DEBUG_ZDT
 bool calc_update_tvad_state(short *pcm_data, int pcm_data_size);
 #endif
 
+void clear_tvad_vad_start_flag(void);
 int ci_tvad_version(void);
 
 #ifdef __cplusplus

@@ -21,7 +21,9 @@
 #define ENG_CMPT_FRAME   50
 
 extern ci_ssp_config_t g_ci_ssp_config;
-
+static bool g_aec_alc_state = true;           //AEC后置固定增益状态 1：启用 0：关闭
+static bool g_aec_ampl_enable = false;        //AEC幅值模式工作使能 1：使能 0：关闭
+static bool g_aec_ampl_mute_flag = false;   //AEC幅值模式输出音频mute，并且不进入AEC迭代  1：启用 0：关闭
 //门限控制
 alg_th_s *alg_th_create(const alg_thr_config_t *alg_thr_config)
 {
@@ -296,16 +298,14 @@ int get_vad_idle_flag_port(void)
     return 1;
 }
 
-//aec播报状态控制
-//extern aec_config_t aec_config;
-
-
-static bool aec_alc_state = true;
 bool get_aec_alc_state(void)
 {
-    return aec_alc_state;
+    return g_aec_alc_state;
 }
-
+bool get_aec_ampl_mute_flag(void)
+{
+    return g_aec_ampl_mute_flag;
+}
 
 void* set_aec_gain(void* wrapfft_audio_t)
 {
@@ -392,7 +392,7 @@ bool aec_ref_flag_set(void *wrapfft_audio_t)
 
     frm_eng_ref = 0.7 * frm_eng_ref + 0.3 * ci_sqrt_f32(cur_frm_eng_ref);
 	wrapfft_audio_st->cur_aec_ref_eng = frm_eng_ref;
-
+    //mprintf("cur_aec_ref_eng =%d\r\r\n",(int32_t)frm_eng_ref);
     /*参考信号能量小于阈值不进行AEC*/
     if(frm_eng_ref <=  aec_ref_thr)
     {
@@ -408,19 +408,13 @@ bool aec_ref_flag_set(void *wrapfft_audio_t)
 void aec_control_alc_disable_port(void)
 {    
     // mprintf("aec_control_alc_disable_port1\r\n");
-    int alc_off_codec_adc_gain_mic = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->alc_off_codec_adc_gain_mic;
-    #if !(OFFLINE_DUAL_MIC_ALG_SUPPORT)//双麦不用aec模块的ref增益，使用外挂codec
-    int alc_off_codec_adc_gain_ref = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->alc_off_codec_adc_gain_ref;
-    #endif
+    int alc_off_codec_adc_gain_l = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->alc_off_codec_adc_gain_l;
+    int alc_off_codec_adc_gain_r = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->alc_off_codec_adc_gain_r;
 
     cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, DISABLE);
-    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, alc_off_codec_adc_gain_mic);
+    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, alc_off_codec_adc_gain_l);
     cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, DISABLE);
-    #if !(OFFLINE_DUAL_MIC_ALG_SUPPORT)
-    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, alc_off_codec_adc_gain_ref);
-    #else
-    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, alc_off_codec_adc_gain_mic);
-    #endif
+    cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, alc_off_codec_adc_gain_r);
 }
 void aec_control_alc_enable_port(void)
 {
@@ -435,6 +429,25 @@ void aec_control_alc_enable_port(void)
 
 static bool aec_start_alc_process(void)
 {
+    if(ciss_get(CI_SS_AEC_TOP_CLIP))
+    {
+        /*削顶后重新设置mic增益*/
+        int alc_off_codec_adc_gain_l = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->alc_off_codec_adc_gain_l;
+        // mprintf("aec top clip mic gain =%d\r\n",alc_off_codec_adc_gain_mic);
+        cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, alc_off_codec_adc_gain_l);
+        #if (OFFLINE_DUAL_MIC_ALG_SUPPORT)
+        int alc_off_codec_adc_gain_r = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->alc_off_codec_adc_gain_r;
+        cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, alc_off_codec_adc_gain_r);
+        #endif
+    }
+    if(ciss_get(CI_SS_DMIC_AND_INNER_REF))
+    {
+        return false;
+    }
+    if(CI_SS_AEC_ALC_CLOSED == ciss_get(CI_SS_AEC_ALC_STATE))
+    {
+        return false;
+    }
     if(CI_SS_AEC_ALC_IDLE == ciss_get(CI_SS_AEC_ALC_STATE))
     {
         uint16_t cnt = 1000;
@@ -454,18 +467,25 @@ static bool aec_start_alc_process(void)
         aec_control_alc_disable_port();
         return true;
     }
-    else
+    else if(CI_SS_AEC_ALC_CLOSED == ciss_get(CI_SS_AEC_ALC_STATE))
     {
-        #if (OFFLINE_DUAL_MIC_ALG_SUPPORT)
-        int alc_off_codec_adc_gain_mic = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->alc_off_codec_adc_gain_mic;
-        cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, alc_off_codec_adc_gain_mic);
-        cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, alc_off_codec_adc_gain_mic);
-        #endif
-        return false;
+        /*未开启ALC，在这里设置AEC期间的增益*/
+        int alc_off_codec_adc_gain_l = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->alc_off_codec_adc_gain_l;
+        int alc_off_codec_adc_gain_r = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->alc_off_codec_adc_gain_r;
+        // mprintf("\r\nalc_off_codec_adc_gain_l = %d\r\n",alc_off_codec_adc_gain_l);
+        // mprintf("\r\nalc_off_codec_adc_gain_r = %d\r\n",alc_off_codec_adc_gain_r);
+        cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, alc_off_codec_adc_gain_l);
+        cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, alc_off_codec_adc_gain_r);
     }
+
+    return false;
 }
 static bool aec_end_alc_process(void)
 {
+    if(ciss_get(CI_SS_DMIC_AND_INNER_REF))
+    {
+        return false;
+    }
     /*进入AEC时开启了ALC，则重新开启*/
     if(CI_SS_AEC_ALC_CLOSED_TO_OPEN == ciss_get(CI_SS_AEC_ALC_STATE))
     {
@@ -474,12 +494,56 @@ static bool aec_end_alc_process(void)
     }
     if(CI_SS_AEC_ALC_CLOSED == ciss_get(CI_SS_AEC_ALC_STATE))
     {
-        #if (OFFLINE_DUAL_MIC_ALG_SUPPORT)
-        cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, 20);
-        cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, 20);
-        #endif
+        /*未开启ALC，在这里设置非AEC期间的增益*/
+        int pre_codec_adc_gain_l = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->pre_codec_adc_gain_l;
+        int pre_codec_adc_gain_r = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->pre_codec_adc_gain_r;
+        // mprintf("\r\npre_codec_adc_gain_l = %d\r\n",pre_codec_adc_gain_l);
+        // mprintf("\r\npre_codec_adc_gain_r = %d\r\n",pre_codec_adc_gain_r);
+        cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, pre_codec_adc_gain_l);
+        cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, pre_codec_adc_gain_r);
     }
     return false;
+}
+static ci_ss_play_state aec_ampl_to_play_state(void *wrapfft_audio_t, ci_ss_play_state pre_aec_play_state)
+{
+    static bool ampl_aec_alc_en_flag = true;
+    static int8_t ampl_aec_start_count = 0;
+    static int8_t ampl_aec_end_count = 0;
+    g_aec_ampl_enable = aec_ref_flag_set(wrapfft_audio_t); //AEC仅由门限控制
+    if (g_aec_ampl_enable)
+    {
+        if(ampl_aec_end_count>0)
+        ampl_aec_end_count--;
+
+        ampl_aec_start_count++;
+        if(ampl_aec_start_count >= 2)
+        {
+           ampl_aec_end_count = 0;
+           ampl_aec_start_count = 2;
+           return CI_SS_PLAY_STATE_PLAYING;
+        }
+    }
+    else
+    {
+        if(ampl_aec_start_count>0)
+        ampl_aec_start_count--;
+
+        ampl_aec_end_count++;
+        if(ampl_aec_end_count >= 60)
+        {
+            ampl_aec_start_count = 0;
+            ampl_aec_end_count = 60;
+            if(CI_SS_PLAY_STATE_IDLE == ciss_get(CI_SS_PLAY_STATE))
+            {
+                return CI_SS_PLAY_STATE_IDLE;
+            }
+            else
+            {
+                return CI_SS_PLAY_STATE_PLAYING_TO_IDLE;
+            }
+        }
+    }
+    return pre_aec_play_state;
 }
 bool ci_aec_application_enable(void *wrapfft_audio_t)
 {
@@ -489,9 +553,9 @@ bool ci_aec_application_enable(void *wrapfft_audio_t)
     static int32_t aec_delay_start_count = 0;
     static int32_t aec_delay_end_count = 0;
     static bool aec_work_enable = false;
-    static bool ampl_aec_alc_en_flag = true;
-    static int8_t ampl_aec_start_count = 0;
-    static int8_t ampl_aec_end_count = 0;
+    static ci_ss_play_state pre_aec_play_state = CI_SS_PLAY_STATE_IDLE;
+    ci_ss_play_state ci_ss_play_state = CI_SS_PLAY_STATE_IDLE;
+    static uint8_t aec_ampl_mute_cnt = 0;
     static uint8_t play_state_aec_idle_cnt = 0; //避免播报状态模式ref_thr设置不对,或者有干扰导致的能量波动大于阈值一直不结束AEC
     aec_control_mode_t aec_control_mode = ((aec_config_t*)(g_ci_ssp_config.aec.module_config))->aec_control_mode; //COMPUTE_REF_AMPL_MODE; //ENABLE_PLAYING_STATE_MODE;
 
@@ -499,163 +563,116 @@ bool ci_aec_application_enable(void *wrapfft_audio_t)
     {
         case ENABLE_PLAYING_STATE_MODE:
         {
-            status_t ci_ss_play_state = ciss_get(CI_SS_PLAY_STATE); //播报状态
-            if (CI_SS_PLAY_STATE_PLAYING == ci_ss_play_state)
-            {
-                aec_enable = aec_ref_flag_set(wrapfft_audio_t); //播报状态下进行aec处理，还有门限控制;
-                alc_open_to_close_flag = aec_start_alc_process(); //alc关闭时计数清0;
-                if (alc_open_to_close_flag)
-                {
-                    aec_delay_start_count = 3;
-                }
-                   
-                if (aec_delay_start_count-- > 0) //alc开始时，前3帧不进行aec处理
-                {
-                    aec_alc_state = false;
-                    return false;
-                }
-                else
-                {
-                    aec_alc_state = true;
-                }
-
-                if(!aec_work_enable && aec_enable)
-                {
-                    play_state_aec_idle_cnt = 60;        //播放结束最多再做60帧AEC
-                    aec_work_enable = true;
-                    parameters_config_aec_normal(true);	 //修改为AEC下的VAD参数
-                    ciss_set(CI_SS_AEC_WORK_STATE, 1);   //aec工作状态
-                }
-
-            }
-            else if(CI_SS_PLAY_STATE_PLAYING_TO_IDLE == ci_ss_play_state)
-            {
-                aec_enable = aec_ref_flag_set(wrapfft_audio_t); //在播报状态切换到非播报状态时，需要门限控制结束;
-                if(!aec_enable || play_state_aec_idle_cnt == 0)
-                {
-                    alc_close_to_open_flag = aec_end_alc_process();
-                    if (alc_close_to_open_flag)
-                    {
-                        aec_delay_end_count = 1;
-                    }
-                    ciss_set(CI_SS_AEC_ALC_STATE,CI_SS_AEC_ALC_IDLE);//复位ALC状态
-                    if (aec_delay_end_count-- > 0) //aec结束时开了ALC，多处理一帧AEC
-                    {
-                        aec_alc_state = true;
-                        return true;
-                    }
-                    else
-                    {
-                        aec_alc_state = false;
-                    }
-                    play_state_aec_idle_cnt = 0;
-                    aec_work_enable = false;
-                    parameters_config_aec_normal(false); //返回默认VAD参数	
-                    ciss_set(CI_SS_AEC_WORK_STATE, 0);   //aec工作状态
-                    ciss_set(CI_SS_PLAY_STATE,CI_SS_PLAY_STATE_IDLE);
-                    aec_delay_start_count = 0;
-                    aec_delay_end_count = 0;
-                }
-                else
-                {
-                    play_state_aec_idle_cnt--;
-                }
-                
-            }
-            else if (CI_SS_PLAY_STATE_IDLE == ci_ss_play_state)
-            {
-                aec_enable = false;
-                aec_alc_state = false;
-            }
+            ci_ss_play_state = ciss_get(CI_SS_PLAY_STATE); //播报状态
             break;
         }
         case COMPUTE_REF_AMPL_MODE:
         {
-            aec_enable = aec_ref_flag_set(wrapfft_audio_t); //AEC仅由门限控制
-            if (aec_enable)
+            ci_ss_play_state = aec_ampl_to_play_state(wrapfft_audio_t,pre_aec_play_state);//通过幅值判断播报状态
+            if(pre_aec_play_state != ci_ss_play_state)
             {
-                if(ampl_aec_alc_en_flag)
-                {
-                    alc_open_to_close_flag = aec_start_alc_process();
-                }
-                if (alc_open_to_close_flag)
-                {
-                    alc_open_to_close_flag = false;
-                    ampl_aec_alc_en_flag = false;
-                    aec_delay_start_count = 3;
-                }
-                   
-                if (aec_delay_start_count-- > 0) //alc开始时，前3帧不进行aec处理
-                {
-                    aec_alc_state = false;
-                    return false;
-                }
-                else
-                {
-                    aec_alc_state = true;
-                }
-                if(ampl_aec_end_count>0)
-                ampl_aec_end_count--;
-                if(!aec_work_enable)
-                {
-                    if(ampl_aec_start_count > 3)
-                    {
-                        aec_work_enable = true;
-                        ampl_aec_start_count = 0;
-                        ciss_set(CI_SS_AEC_WORK_STATE, 1);   //aec工作状态
-                    }
-                    ampl_aec_start_count++;
-                }
-            }
-            else
-            {
-                alc_close_to_open_flag = aec_end_alc_process();
-                if(CI_SS_AEC_ALC_IDLE != ciss_get(CI_SS_AEC_ALC_STATE))
-                {
-                    ciss_set(CI_SS_AEC_ALC_STATE,CI_SS_AEC_ALC_IDLE);//复位ALC状态
-                }
-                if (alc_close_to_open_flag)
-                {
-                    aec_delay_end_count = 1;
-                }
-                
-                if (aec_delay_end_count-- > 0) //aec结束时开了ALC，多处理一帧AEC
-                {
-                    aec_alc_state = true;
-                    return true;
-                }
-                else
-                {
-                    aec_alc_state = false;
-                }
-                if(ampl_aec_start_count>0)
-                ampl_aec_start_count--;
-                if(aec_work_enable)
-                {
-                    if(ampl_aec_end_count > 3)
-                    {
-                        aec_work_enable = false;
-                        ampl_aec_end_count = 0;
-                        ciss_set(CI_SS_AEC_WORK_STATE, 0);   //aec工作状态
-                    }
-                    ampl_aec_end_count++;
-                }
-            }
-
-            if(aec_delay_start_count<0)
-            {
-                aec_delay_start_count = -1;
-            }
-            if(aec_delay_end_count<0)
-            {
-                aec_delay_end_count = -1;
+                ciss_set(CI_SS_PLAY_STATE,ci_ss_play_state);
+                pre_aec_play_state = ci_ss_play_state;
             }
             break;
         }
         default:
         {
-            // CI_ASSERT(0,"\n");
+            CI_ASSERT(0,"\n");
         }
+    }
+
+    if (CI_SS_PLAY_STATE_PLAYING == ci_ss_play_state)
+    {
+        if(aec_control_mode == ENABLE_PLAYING_STATE_MODE)
+        {
+            aec_enable = aec_ref_flag_set(wrapfft_audio_t); //播报状态下进行aec处理，还有门限控制;
+        }
+        else
+        {
+            //幅值模式存在mic收音时回声在两种增益下，所以要等待增益稳定后再进行AEC
+            if(aec_ampl_mute_cnt++ <= 6)
+            {
+                g_aec_ampl_mute_flag = true;
+            }
+            else
+            {
+                aec_ampl_mute_cnt = 7;
+                g_aec_ampl_mute_flag = false;
+            }
+            aec_enable = g_aec_ampl_enable;//幅值模式在aec_ampl_to_play_state中计算
+        }
+        alc_open_to_close_flag = aec_start_alc_process(); //alc关闭时计数清0;
+        if (alc_open_to_close_flag)
+        {
+            aec_delay_start_count = 3;
+        }
+            
+        if (aec_delay_start_count-- > 0) //alc开始时，前3帧不进行aec处理
+        {
+            g_aec_alc_state = false;
+            return false;
+        }
+        else
+        {
+            g_aec_alc_state = true;
+        }
+
+        if(!aec_work_enable && aec_enable)
+        {
+            play_state_aec_idle_cnt = 60;        //播放结束最多再做60帧AEC
+            aec_work_enable = true;
+            parameters_config_aec_normal(true);	 //修改为AEC下的VAD参数
+            ciss_set(CI_SS_AEC_WORK_STATE, 1);   //aec工作状态
+        }
+
+    }
+    else if(CI_SS_PLAY_STATE_PLAYING_TO_IDLE == ci_ss_play_state)
+    {
+        if(aec_control_mode == ENABLE_PLAYING_STATE_MODE)
+        {
+            aec_enable = aec_ref_flag_set(wrapfft_audio_t); //在播报状态切换到非播报状态时，需要门限控制结束;
+        }
+        else
+        {
+            aec_enable = g_aec_ampl_enable;//幅值模式在aec_ampl_to_play_state中计算
+        }
+        if(!aec_enable || play_state_aec_idle_cnt == 0)
+        {
+            alc_close_to_open_flag = aec_end_alc_process();
+            if (alc_close_to_open_flag)
+            {
+                aec_delay_end_count = 1;
+            }
+            ciss_set(CI_SS_AEC_ALC_STATE,CI_SS_AEC_ALC_IDLE);//复位ALC状态
+            if (aec_delay_end_count-- > 0) //aec结束时开了ALC，多处理一帧AEC
+            {
+                g_aec_alc_state = true;
+                return true;
+            }
+            else
+            {
+                g_aec_alc_state = false;
+            }
+            play_state_aec_idle_cnt = 0;
+            aec_work_enable = false;
+            parameters_config_aec_normal(false); //返回默认VAD参数	
+            ciss_set(CI_SS_AEC_WORK_STATE, 0);   //aec工作状态
+            ciss_set(CI_SS_PLAY_STATE,CI_SS_PLAY_STATE_IDLE);
+            aec_delay_start_count = 0;
+            aec_delay_end_count = 0;
+            aec_ampl_mute_cnt = 0;
+        }
+        else
+        {
+            play_state_aec_idle_cnt--;
+        }
+        
+    }
+    else if (CI_SS_PLAY_STATE_IDLE == ci_ss_play_state)
+    {
+        aec_enable = false;
+        g_aec_alc_state = false;
     }
 
     return aec_enable;

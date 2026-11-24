@@ -39,12 +39,6 @@
 #include "cwsl_manage.h"
 #include "cias_voice_upload.h"
 #include "cias_aiot_protocol.h"
-#if USE_IR_ENABLE
-#include "main_device.h"
-#include "middle_device.h"
-#include "ir_uart_msg_deal.h"
-#include "buzzer_voice.h"
-#endif
 #if SIMPLE_AUDIO_PLAYER_ENABLE
 #include "simple_audio_player.h"
 #else
@@ -99,14 +93,6 @@ static int8_t ignore_exit_wakeup = 0;
 static int8_t ignore_asr_msg = 0;
 
 extern CiasAiotRunParamTypedef gCiasAiotRunParam;;
-#if USE_IR_ENABLE
-static int exit_wakeup_timeout = gCiasAiotFuncParam.wake_up_continue_timeout*1000;
-
-void change_wakeup_period(uint32_t exit_wakup_ms)
-{
-    exit_wakeup_timeout = exit_wakup_ms;
-}
-#endif
 /**
  * @brief check now playing state, AEC or DENOISE maybe used this function
  *
@@ -182,9 +168,7 @@ void pause_asr(uint8_t voice_in_mute, uint8_t pause_asr_task)
 
     sys_manage_data.pause_asr_count++;
 #endif
-#if USE_IR_ENABLE
-      xTimerStop(exit_wakeup_timer,0);
-#endif
+
 }
 
 /**
@@ -220,13 +204,7 @@ void  resume_asr()
         }
     }
 #endif
-    #if USE_IR_ENABLE
-    if (sys_manage_data.wakeup_state == SYS_STATE_WAKEUP)
-    {
-        xTimerChangePeriod(exit_wakeup_timer, pdMS_TO_TICKS(exit_wakeup_timeout),0);/*or used a new timer*/
-        xTimerStart(exit_wakeup_timer, 0);
-    }
-    #endif
+
 }
 
 
@@ -327,8 +305,6 @@ void set_state_exit_wakeup(void)
 }
 
 
-
-
 #if USE_LOWPOWER_OSC_FREQUENCY
 /* 退出降频模式进入osc时钟模式定时器 */
 xTimerHandle exit_down_freq_mode_timer = NULL;
@@ -402,12 +378,8 @@ void change_asr_wakeup_word(void)
     
     xSemaphoreGive(WakeupMutex);
 
-    #if ADAPTIVE_THRESHOLD
+    #if NOISE_ADAPTIVE_CONFIDENCE_EN
     dynmic_confidence_en_cfg(0);
-    #endif
-    #if DEEP_SEPARATE_ENABLE && !BF_DEEPSE_MODE 
-    mprintf("set CI_SS_CMD_ASR_CHA_NUM 2\n");
-    ciss_set(CI_SS_CMD_ASR_CHA_NUM, 2);      
     #endif
     #if USE_SEPARATE_WAKEUP_EN
     cmd_info_change_cur_model_group(1);
@@ -456,10 +428,7 @@ void change_asr_normal_word(void)
     #if (ASR_SKIP_FRAME_CONFIG == 1)
     asr_dynamic_skip_open();
     #endif
-    #if DEEP_SEPARATE_ENABLE && !BF_DEEPSE_MODE 
-    mprintf("set CI_SS_CMD_ASR_CHA_NUM 1\n");
-    ciss_set(CI_SS_CMD_ASR_CHA_NUM,1);
-    #endif
+
     #if USE_SEPARATE_WAKEUP_EN
     cmd_info_change_cur_model_group(0);
     ignore_asr_msg++;
@@ -470,7 +439,7 @@ void change_asr_normal_word(void)
     send_msg_to_sys_task(&send_msg, NULL);
     #endif
 
-    #if ADAPTIVE_THRESHOLD
+    #if NOISE_ADAPTIVE_CONFIDENCE_EN
     dynmic_confidence_en_cfg(1);
     dynmic_confidence_config(-20, 10, 1);
     #endif
@@ -508,9 +477,6 @@ void play_exit_wakeup_done_cb(cmd_handle_t cmd_handle)
     send_msg.msg_data.cmd_info_data.cmd_info_status = MSG_CMD_INFO_STATUS_POST_CHANGE_ASR_WAKEUP_WORD;
     send_msg_to_sys_task(&send_msg, NULL);
     mprintf("inactivate\n");
-    #if USE_IR_ENABLE
-    user_led_light_flash();
-    #endif
 
 }
 
@@ -566,9 +532,6 @@ void exit_wakeup_deal(uint32_t asr_busy_check)
     vpr_delete_tmp_flag = 0;
     vpr_delete_all_flag = 0;
     g_voice_print_rec_index = -1;
-    #endif
-    #if USE_IR_ENABLE
-    main_device_overLearnIR(pdFALSE, 0);
     #endif
     xSemaphoreGive(WakeupMutex);
 }
@@ -635,13 +598,6 @@ void enter_wakeup_deal(uint32_t exit_wakup_ms, cmd_handle_t cmd_handle )
             }
         #endif
 
-        #if USE_IR_ENABLE
-        if (NULL != DeviceGetLearnModeDevice())
-        {
-            //有匹配的时候 退出匹配状态
-            main_device_overLearnIR(pdFALSE, 0);
-        }
-        #endif
     }
     /*set wakeup state,and update timer*/
     set_state_enter_wakeup(exit_wakup_ms);
@@ -714,14 +670,6 @@ void enter_wakeup_deal_v1(uint32_t exit_wakup_ms, cmd_handle_t cmd_handle )
                 play_enter_wakeup_done_cb(cmd_handle);
             }
         #endif
-
-        #if USE_IR_ENABLE
-        if (NULL != DeviceGetLearnModeDevice())
-        {
-            //有匹配的时候 退出匹配状态
-            main_device_overLearnIR(pdFALSE, 0);
-        }
-        #endif
     }
     /*set wakeup state,and update timer*/
     set_state_enter_wakeup(exit_wakup_ms);
@@ -763,7 +711,23 @@ uint8_t vol_set(char vol)
     {
         sys_manage_data.volset = vol;
         audio_play_set_vol_gain(67*vol/VOLUME_MAX + 7);
-        cinv_item_write(NVDATA_ID_VOLUME, sizeof(sys_manage_data.volset), &sys_manage_data.volset);
+
+        uint8_t volume;
+        uint16_t real_len;
+        if(CINV_OPER_SUCCESS != cinv_item_read(NVDATA_ID_VOLUME, sizeof(volume), &volume, &real_len))
+        {
+            /* nvdata内无播放音量则配置为初始默认音量并写入nv */
+            volume = VOLUME_DEFAULT;
+            cinv_item_init(NVDATA_ID_VOLUME, sizeof(volume), &volume);
+        }
+        else
+        {
+            if(volume != vol)
+            {
+                cinv_item_write(NVDATA_ID_VOLUME, sizeof(sys_manage_data.volset), &sys_manage_data.volset);
+            }
+        }
+
     }
     return sys_manage_data.volset;
 }
@@ -947,19 +911,6 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
             ciss_set(CI_SS_CMD_STATE_FOR_SSP,CI_SS_CMD_IS_WAKEUP);
             if (cwsl_get_status() != CWSL_STA_REG_TEMPLATE)
             {
-                #if USE_IR_ENABLE
-                uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
-                if (MAIN_ASR_ONESHORT_OPEN_AIR == semantic_id)
-                {
-                    air_ctl(1,cmd_handle);
-                }
-                else if (MAIN_ASR_ONESHORT_CLOSE_AIR == semantic_id)
-                {
-                    air_ctl(0,cmd_handle);
-                }
-                user_led_light_on();
-                user_led_light_flash();
-                #endif
                 enter_wakeup_deal(gCiasAiotFuncParam.wake_up_continue_timeout*1000,cmd_handle);    /*updata wakeup state*/
             }
         }
@@ -986,6 +937,7 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
             uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
             uint16_t cmd_id = cmd_info_get_command_id(cmd_handle);
 #if !UPLOAD_PCM_DATA_ENABLE
+
             uint8_t cmd_id_buf[2] = {0};
             cmd_id_buf[0]= (cmd_id & 0xff);
             cmd_id_buf[1] = ((cmd_id >> 8) & 0xff);
@@ -1061,7 +1013,6 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
 void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
 {
     cmd_handle_t cmd_handle;
-
     if(MSG_ASR_STATUS_GOOD_RESULT == asr_msg->asr_status && (ignore_asr_msg == 0))
     {
         int send_cancel_ignore_msg = 0;
@@ -1076,24 +1027,10 @@ void sys_deal_asr_msg(sys_msg_asr_data_t *asr_msg)
         ciss_set(CI_SS_CMD_SCORE,asr_msg->asr_score);
         if(cmd_info_is_wakeup_word(cmd_handle)) /*wakeup word*/
         {
-
             mprintf("----voice_upload_enable---\n");
             asr_wakeup_on_handle();
             #if AUDIO_DATA_UPLOAD_BY_UART
             weakup_asr_hander = cmd_handle;
-            #endif
-            #if USE_IR_ENABLE
-            uint32_t semantic_id = cmd_info_get_semantic_id(cmd_handle);
-            if (MAIN_ASR_ONESHORT_OPEN_AIR == semantic_id)
-            {
-                air_ctl(1,cmd_handle);
-            }
-            else if (MAIN_ASR_ONESHORT_CLOSE_AIR == semantic_id)
-            {
-                air_ctl(0,cmd_handle);
-            }
-            user_led_light_on();
-            user_led_light_flash();
             #endif
             /*updata wakeup state*/
             ciss_set(CI_SS_CMD_STATE,CI_SS_CMD_IS_WAKEUP);
@@ -1209,14 +1146,10 @@ void UserTaskManageProcess(void *p_arg)
     ciss_set(CI_SS_WAKING_UP_STATE_FOR_SSP,CI_SS_NO_WAKEUP);
     #endif    
     xTaskResumeAll();
+
     /* 退出唤醒timer和led pwm控制timer 初始化 */
-    #if USE_IR_ENABLE
-    exit_wakeup_timer = xTimerCreate("exit_wakeup", pdMS_TO_TICKS(exit_wakeup_timeout),
-        pdFALSE, (void *)0, exit_wakeup_timer_callback);
-    #else
     exit_wakeup_timer = xTimerCreate("exit_wakeup", pdMS_TO_TICKS(gCiasAiotFuncParam.wake_up_continue_timeout*1000),
         pdFALSE, (void *)0, exit_wakeup_timer_callback);
-    #endif
 
     if(NULL == exit_wakeup_timer)
     {
@@ -1265,19 +1198,6 @@ void UserTaskManageProcess(void *p_arg)
                 /* 音频采集任务消息，目前处理音频采集开启完成，在这里播放欢迎词 */
                 case SYS_MSG_TYPE_AUDIO_IN_STARTED:
                 {
-                    uint8_t volume;
-                    uint16_t real_len;
-
-                    /* 从nvdata里读取播放音量 */
-                    if(CINV_OPER_SUCCESS != cinv_item_read(NVDATA_ID_VOLUME, sizeof(volume), &volume, &real_len))
-                    {
-                        /* nvdata内无播放音量则配置为初始默认音量并写入nv */
-                        volume = VOLUME_DEFAULT;
-                        cinv_item_init(NVDATA_ID_VOLUME, sizeof(volume), &volume);
-                    }
-                    /* 音量设置 */
-                    vol_set(volume);
-
                     #if (EXCEPTION_RST_SKIP_BOOT_PROMPT)
                     if (RETURN_OK != scu_get_system_reset_state())
                     {
@@ -1402,7 +1322,7 @@ void bnpu_dnn_param_cfg(void)
 #if USE_PWK
 void ci_pwk_get_cb(int db_val)
 {
-	mprintf("--------pwk db val: %ddb\n", db_val);
+	mprintf("pwk db val: %ddb\n", db_val);
 }
 #endif
 

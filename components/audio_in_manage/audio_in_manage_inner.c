@@ -30,6 +30,7 @@
 #include "cias_network_msg_protocol.h"
 #include "cias_voice_upload.h"
 #include "cias_aiot_protocol.h"
+#include "ci_adapt_aec.h"
 /**************************************************************************
                     typedef
 ****************************************************************************/
@@ -38,7 +39,9 @@
                     global
 ****************************************************************************/
 volatile int sys_err_flag = false;
-
+#if AEC_TOP_CLIP_DETECT_ENABLE &&USE_AEC_MODULE
+extern aec_config_t aec_config;
+#endif
 /**************************************************************************
                     function
 ****************************************************************************/
@@ -275,16 +278,6 @@ uint32_t get_nn_denoise_model_addr(void)
     return addr;
 }
 
-
-void ci_ssp_alg_switch_init(void)
-{
-#if (IF_USE_ANOTHER_CODEC_TO_GET_REF || REF_IN_FROM_INNER_CODEC)
-    ciss_set(CI_SS_TWO_CODEC_IS_USED, true);
-#else
-    ciss_set(CI_SS_TWO_CODEC_IS_USED, false);
-#endif
-}
-
 static void ven_callback_fun(float vn)
 {
     mprintf("voice energy = %d\n", (int)vn);
@@ -292,7 +285,6 @@ static void ven_callback_fun(float vn)
 
 void audio_in_manage_inner_task(void *p)
 {
-    ci_ssp_alg_switch_init();
     //打印中间结果
     #if ASR_MIDDLE_RESULT_OUT_EN
     ctr_asr_detail_result(1);
@@ -319,6 +311,10 @@ void audio_in_manage_inner_task(void *p)
 #endif
 #if REF_IN_FROM_INNER_CODEC
     ref_inner_codec_registe();
+    cm_set_codec_alc(REF_RECORD_INNER_CODEC_ID, CM_CHA_LEFT,  DISABLE);   
+    cm_set_codec_adc_gain(REF_RECORD_INNER_CODEC_ID, CM_CHA_LEFT, AEC_PGA_GAIN_L);
+    cm_set_codec_alc(REF_RECORD_INNER_CODEC_ID, CM_CHA_RIGHT,  DISABLE);
+    cm_set_codec_adc_gain(REF_RECORD_INNER_CODEC_ID, CM_CHA_RIGHT, AEC_PGA_GAIN_R);
     cm_start_codec(REF_RECORD_INNER_CODEC_ID, CODEC_INPUT);
 #endif
     cm_start_codec(HOST_MIC_RECORD_CODEC_ID, CODEC_INPUT);
@@ -411,37 +407,106 @@ void audio_in_manage_inner_task(void *p)
             ci_logwarn(CI_LOG_WARN, "iisdma int too slow\n");
             continue;
         }
+#if AEC_TOP_CLIP_DETECT_ENABLE && USE_AEC_MODULE
+        static uint16_t aec_max_mic_energy[16] = {0};
+        static uint8_t inter_cnt = 0;
+        static bool aec_mic_gain_set_flag = false;
+        static uint8_t mic_gain_change_cnt = 0;
+        static uint8_t mic_top_clip_cnt = 0;
+        static uint8_t pre_mic_top_clip_cnt = 0;
+        int16_t* data_p = (int16_t*)data_addr;
+        if(CI_SS_PLAY_STATE_PLAYING == ciss_get(CI_SS_PLAY_STATE))
         {
-            audio_in_get_voice_t voice_info_str;
-            voice_info_str.cha_num = 1;
-            voice_info_str.channel_flag = 1;
-            voice_info_str.addr1 = data_addr;
 
-#if IF_USE_ANOTHER_CODEC_TO_GET_REF || REF_IN_FROM_INNER_CODEC
-            voice_info_str.addr2 = data_addr_ref;
-            voice_info_str.cha_num = 2;
-#else
-            voice_info_str.cha_num = 1;
-            voice_info_str.addr2 = 0;
-#endif
-            voice_info_str.size = data_size;
-
-            if (voice_energy_gate)
+            for(int j = 0; j < 16; j++)
             {
-                int16_t *voice_data = (int16_t *)data_addr;
-                float voice_energy = 0.0f;
-                for (int i = 0; i < data_size / 2; i++)
+                for (int i = 0; i < 16; i++)
                 {
-                    voice_energy += (float)(voice_data[i] * voice_data[i]);
-                }
-                if (get_voice_energy_callback_fun)
-                {
-                    get_voice_energy_callback_fun(voice_energy / ((float)(data_size / 2)));
+                    if(aec_max_mic_energy[j] < abs((data_p[2*j*16+2*i])))
+                    aec_max_mic_energy[j] = abs((data_p[2*j*16+2*i]));
                 }
             }
 
-            send_voice_info_to_audio_in_manage(&voice_info_str);
+            for (int i = 0; i < 16; i++)
+            {
+                if(aec_max_mic_energy[i] > 30000)
+                mic_top_clip_cnt++;
+            }
+
+            //间隔五帧再检查是否削顶，减小mic增益
+            if(inter_cnt < 5)
+            inter_cnt++;
+            if(mic_top_clip_cnt + pre_mic_top_clip_cnt >= 2) 
+            {
+                if(!aec_mic_gain_set_flag && inter_cnt>=5)
+                {
+                    mic_gain_change_cnt++;
+                    inter_cnt =0;
+                    aec_config.alc_off_codec_adc_gain_l -= AEC_TOP_CLIP_REDUCE_GAIN;
+                    #if OFFLINE_DUAL_MIC_ALG_SUPPORT
+                    aec_config.alc_off_codec_adc_gain_r -= AEC_TOP_CLIP_REDUCE_GAIN;
+                    #endif
+                    mprintf("mic gain reduce to %d\r\n",aec_config.alc_off_codec_adc_gain_l);
+                    if(mic_gain_change_cnt >= 3)//快速减少3次mic增益，每次不减少太多，可以保证在不削顶情况下mic最大的增益
+                    {
+                        aec_mic_gain_set_flag = true;
+                    }
+                }
+                ciss_set(CI_SS_AEC_TOP_CLIP,1);
+                mprintf("--CI_SS_AEC_TOP_CLIP1!!\r\n");
+            }
+
+            pre_mic_top_clip_cnt = mic_top_clip_cnt;
+            mic_top_clip_cnt = 0;
+            for (int i = 0; i < 16; i++)
+            {
+                aec_max_mic_energy[i] = 0;
+            }
         }
+        else
+        {
+            if(0 != mic_gain_change_cnt)
+            {
+                aec_mic_gain_set_flag = false;
+                aec_config.alc_off_codec_adc_gain_l += mic_gain_change_cnt * AEC_TOP_CLIP_REDUCE_GAIN;
+                #if OFFLINE_DUAL_MIC_ALG_SUPPORT
+                aec_config.alc_off_codec_adc_gain_r += mic_gain_change_cnt * AEC_TOP_CLIP_REDUCE_GAIN;
+                #endif
+                mprintf("play idle mic gain back to %d\r\n",aec_config.alc_off_codec_adc_gain_l);
+                mic_gain_change_cnt = 0;
+            }
+
+        }
+#endif
+        audio_in_get_voice_t voice_info_str;
+        voice_info_str.cha_num = 1;
+        voice_info_str.channel_flag = 1;
+        voice_info_str.addr1 = data_addr;
+
+#if IF_USE_ANOTHER_CODEC_TO_GET_REF || REF_IN_FROM_INNER_CODEC
+        voice_info_str.addr2 = data_addr_ref;
+        voice_info_str.cha_num = 2;
+#else
+        voice_info_str.cha_num = 1;
+        voice_info_str.addr2 = 0;
+#endif
+        voice_info_str.size = data_size;
+
+        if (voice_energy_gate)
+        {
+            int16_t *voice_data = (int16_t *)data_addr;
+            float voice_energy = 0.0f;
+            for (int i = 0; i < data_size / 2; i++)
+            {
+                voice_energy += (float)(voice_data[i] * voice_data[i]);
+            }
+            if (get_voice_energy_callback_fun)
+            {
+                get_voice_energy_callback_fun(voice_energy / ((float)(data_size / 2)));
+            }
+        }
+
+        send_voice_info_to_audio_in_manage(&voice_info_str);
         iwdg_feed(IWDG);
     }
 }

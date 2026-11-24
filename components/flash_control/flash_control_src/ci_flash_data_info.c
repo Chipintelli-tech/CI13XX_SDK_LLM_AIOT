@@ -278,11 +278,13 @@ uint32_t ci_flash_data_info_init(uint8_t default_model_group_id)
 
     //读取分区信息表
     post_read_flash((char *)&partition_table,FILECONFIG_SPIFLASH_START_ADDR, sizeof(partition_table_t));
-    if(get_partition_table_crc(&partition_table) != partition_table.patitiontablechecksum)
+    if(get_partition_table_crc(&partition_table) != partition_table.patitiontablechecksum 
+    || partition_table.patitiontablechecksum == 0x0 || partition_table.patitiontablechecksum == 0xFFFF)
     {
         mprintf("patition table err\n");
         post_read_flash((char *)&partition_table,FILECONFIG_SPIFLASH_BAK_ADDR, sizeof(partition_table_t));
-        if(get_partition_table_crc(&partition_table) != partition_table.patitiontablechecksum)
+        if(get_partition_table_crc(&partition_table) != partition_table.patitiontablechecksum
+    || partition_table.patitiontablechecksum == 0x0 || partition_table.patitiontablechecksum == 0xFFFF)
         {
             mprintf("patition table bak err\n");
             UartPollingSenddone((UART_TypeDef*)CONFIG_CI_LOG_UART);

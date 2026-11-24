@@ -103,7 +103,7 @@ ci_ssp_config_t g_ci_ssp_config = {
 	.tra_denoise = {false, NULL, NULL, NULL},
 #endif
 #if USE_NN_VAD
-	.nn_vad = {false, ci_nn_vad_module_init, NULL, NULL},
+	.nn_vad = {false, ci_nn_vad_module_init, ci_nn_vad_processing, NULL},
 #else
 	.nn_vad = {false, NULL, NULL, NULL},
 #endif
@@ -240,10 +240,9 @@ void * ci_nn_noise_est_init(void *module_config, void *wrapfft_audio_t)
 		CI_ASSERT(0, "\n");
 	}
 	uint32_t size_stop = get_alg_malloc_size() + get_remote_calloc_size();
-	noise_est_config_t *noise_est_config = (noise_est_config_t *)module_config;
-	uint32_t ai_noise_est_version = get_ai_noise_est_version();
-	ci_logdebug(LOG_SSP_MODULE, "ci_ai_noise_est_size = %d\n", size_stop - size_start);
-	ci_logdebug(LOG_SSP_MODULE, "ai_noise_est_version = %d\n", ai_noise_est_version);
+	uint32_t nn_noise_est_version = get_nn_noise_est_version();
+	ci_logdebug(LOG_SSP_MODULE, "ci_nn_noise_est_size = %d\n", size_stop - size_start);
+	ci_logdebug(LOG_SSP_MODULE, "nn_noise_est_version = %d\n", nn_noise_est_version);
 
 	return handle_ptr;
 }
@@ -351,7 +350,7 @@ void ci_nn_vad_module_init(void *module_config, void *wrapfft_audio_t)
     tvad_set_out_time_end(m_tvad_config->tvad_on_timeout);
     tvad_set_max_valid_frame_num( m_tvad_config->tvad_valid_num);
     tvad_set_end_delay_frames(m_tvad_config->tvad_end_delay);
-    tvad_set_end_delay_enable( m_tvad_config->tvad_timeout_enable);
+    tvad_set_out_time_enable( m_tvad_config->tvad_timeout_enable);
 	tvad_set_min_speech_db(m_tvad_config->tvad_min_speech_db);
 	tvad_set_upload_mode(m_tvad_config->vad_upload_mode);
 	uint32_t tvad_version = ci_tvad_version();
@@ -359,6 +358,43 @@ void ci_nn_vad_module_init(void *module_config, void *wrapfft_audio_t)
 	ci_logdebug(LOG_SSP_MODULE, "tvad use mem size = %d\n", size_stop - size_start);
 	ci_logdebug(LOG_SSP_MODULE, "tvad_version = %d\n", tvad_version);
    
+}
+
+
+int ci_nn_vad_processing(void *handle, void *wrapfft_audio_t)
+{
+	ci_ss_nn_vad_param_state_t nn_vad_set_state = ciss_get(CI_SS_NN_VAD_PARAM_SET);
+	tvad_config_t* tvad_param = (tvad_config_t*)(g_ci_ssp_config.nn_vad.module_config); 
+	switch (nn_vad_set_state)
+	{
+		case CI_SS_NN_VAD_PARAM_END_DELAY:
+		tvad_set_end_delay_frames(tvad_param->tvad_end_delay);
+		break;
+		case CI_SS_NN_VAD_PARAM_OUT_END_EN:
+		tvad_set_out_time_enable(tvad_param->tvad_timeout_enable);
+		break;
+		case CI_SS_NN_VAD_PARAM_OUT_END:
+		tvad_set_out_time_end(tvad_param->tvad_on_timeout);
+		break;
+		case CI_SS_NN_VAD_PARAM_SEN_LEVEL:
+		set_tvad_sensitity_level(tvad_param->tvad_start_sen);
+		break;
+		case CI_SS_NN_VAD_PARAM_VALID_FRAME:
+		tvad_set_max_valid_frame_num(tvad_param->tvad_valid_num);
+		break;
+		case CI_SS_NN_VAD_PARAM_MIN_SPEECH:
+		tvad_set_min_speech_db(tvad_param->tvad_min_speech_db);
+		break;
+		case CI_SS_NN_VAD_PARAM_UPLOAD_MODE:
+		clear_tvad_vad_start_flag();
+		tvad_set_upload_mode(tvad_param->vad_upload_mode);
+		break;
+	default:
+		return 0;
+		break;
+	}
+	ciss_set(CI_SS_NN_VAD_PARAM_SET,CI_SS_NN_VAD_PARAM_IDLE);
+	return 0;
 }
 
 #if USE_NN_DOA || USE_GCC_DOA
@@ -387,11 +423,6 @@ bool set_doa_out_type(int type)
 void *ci_doa_module_init(void *module_config, void *wrapfft_audio_t)
 {
 	uint32_t doa_version = 0;
-
-	cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, DISABLE);
-	cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, 20);
-	cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, DISABLE);
-	cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, 20);
 
 	uint32_t size_start = get_alg_malloc_size() + get_remote_calloc_size();
 	void *handle_ptr = NULL;
@@ -491,10 +522,6 @@ void *ci_dereverb_module_init(void *module_config, void *wrapfft_audio_t)
 {
 	uint32_t size_start = get_alg_malloc_size() + get_remote_calloc_size();
 
-	cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, DISABLE);
-	cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, 20);
-	cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, DISABLE);
-	cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, 20);
 	void *handle_ptr = ci_dereverb_create(module_config);
 	if(!handle_ptr)
 	{
@@ -521,11 +548,6 @@ int ci_dereverb_processing(void *handle, void *wrapfft_audio_t)
 //BF模块
 void *ci_bf_module_init(void *module_config, void *wrapfft_audio_t)
 {
-	cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, DISABLE);
-	cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_LEFT, 20);
-	cm_set_codec_alc(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, DISABLE);
-	cm_set_codec_adc_gain(HOST_MIC_RECORD_CODEC_ID, CM_CHA_RIGHT, 20);
-
 	uint32_t size_start = get_alg_malloc_size() + get_remote_calloc_size();
 	void *handle_ptr = ci_bf_create(module_config);
 	if(!handle_ptr)
@@ -580,15 +602,6 @@ void *ci_aec_module_init(void *module_config, void *wrapfft_audio_t)
 //aec单帧耗时700us，加上vad通路，需要880us
 int ci_aec_processing(void *handle, void *wrapfft_audio_t)
 {
-	#if 0//TIME_CONT_EN
-    static uint8_t timer_init_flag = 1;
-    if(timer_init_flag)
-    {
-        init_timer0();
-        timer_init_flag = 0;
-    }
-    timer0_start_count();
-    #endif
 #if USE_CWSL && USE_AEC_MODULE
 	if (ciss_get(CI_SS_CWSL_IN_REG)) //如果在学习状态，直接返回
 	{
@@ -596,15 +609,45 @@ int ci_aec_processing(void *handle, void *wrapfft_audio_t)
 	}
 #endif
 	int ret = 0;
+	static bool aec_top_clip_flag = false;
 	ci_wrapfft_audio *wrapfft_audio_st = (ci_wrapfft_audio *)wrapfft_audio_t;
 	bool aec_process_enable = ci_aec_application_enable(wrapfft_audio_st);
-	if (aec_process_enable)
+	if (aec_process_enable && !ciss_get(CI_SS_AEC_TOP_CLIP) && !get_aec_ampl_mute_flag())
 	{
 		ret = ci_adapt_aec_deal(handle, wrapfft_audio_st->fft_mic_out, wrapfft_audio_st->fft_ref_out, wrapfft_audio_st->fft_mic_out,wrapfft_audio_st->ssp_dst_data);
 	}
 	else
 	{
-		/*nothing */
+
+		if(ciss_get(CI_SS_AEC_WORK_STATE))
+		{
+			memcpy(wrapfft_audio_st->ssp_dst_data,  wrapfft_audio_st->fft_mic_out[0], 256*2*sizeof(float));
+		}
+
+		if(get_aec_ampl_mute_flag() || ciss_get(CI_SS_AEC_TOP_CLIP))
+		{
+			Complex ** mic_fft = (Complex **) wrapfft_audio_st->fft_mic_out;
+			Complex * ssp_dst_fft = (Complex *) wrapfft_audio_st->ssp_dst_data;
+			for(int i = 0; i <= 256; i++)
+			{
+				mic_fft[0][i].real = 0.0f;
+				mic_fft[0][i].image = 0.0f;
+				ssp_dst_fft[i].real  = 0.0f;
+				ssp_dst_fft[i].image = 0.0f;
+			}
+			if(ciss_get(CI_SS_AEC_TOP_CLIP))
+			{
+				aec_top_clip_flag = true;
+				mprintf("CI_SS_AEC_TOP_CLIP clear\r\n");
+				ciss_set(CI_SS_AEC_TOP_CLIP,0);
+			}
+		}
+		if(aec_top_clip_flag && (CI_SS_PLAY_STATE_IDLE == ciss_get(CI_SS_PLAY_STATE)))
+		{
+			// mprintf("zt aec_top_clip_flag\r\n");
+			aec_top_clip_flag = false;
+			ci_aec_para_reset(handle);
+		}
 	}
 	if(get_aec_alc_state())
 	{
@@ -622,7 +665,7 @@ void *ci_iis_out_audio_module_init(void *module_config, void *wrapfft_audio_t)
 }
 short *iis_audio_choose(audio_channel_model channel_model, ci_wrapfft_audio *wrapfft_audio_t)
 {
-	short *dst_data;
+	short *dst_data = NULL;
 	//ci_logdebug(LOG_SYS_INFO, "channel_model = %d\r\n", channel_model);
 	switch (channel_model)
 	{

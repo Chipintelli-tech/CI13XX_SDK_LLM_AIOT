@@ -387,8 +387,8 @@ const cm_codec_hw_info_t host_mic_hw_info =
     .codec_gain.codec_adc_input_mode_l = INNER_CODEC_INPUT_MODE_SINGGLE_ENDED,
 #endif 
     .codec_gain.codec_adc_input_mode_r = INNER_CODEC_INPUT_MODE_DIFF,
-    .codec_gain.codec_adc_mic_amp_l = INNER_CODEC_MIC_AMP_12dB,
-    .codec_gain.codec_adc_mic_amp_r = INNER_CODEC_MIC_AMP_12dB,
+    .codec_gain.codec_adc_mic_amp_l = CODEC_ADC_MIC_AMP_L,
+    .codec_gain.codec_adc_mic_amp_r = CODEC_ADC_MIC_AMP_R,
     .codec_gain.pga_gain_l = 28.5f,
     .codec_gain.pga_gain_r = 28.5f,
 #if (MIC_DIFF_SINGLE == 0)
